@@ -1,0 +1,3008 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NutriTrack Pro - Calculateur de Repas, Macros & Score Yuka</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- HTML5-QRCode Library for Camera Barcode Scanning -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        macro: {
+                            cal: '#10b981', // Emerald 500
+                            pro: '#6366f1', // Indigo 500
+                            carb: '#f59e0b', // Amber 500
+                            fat: '#f43f5e'  // Rose 500
+                        },
+                        yuka: {
+                            excellent: '#15803d', // Green 700 (75-100)
+                            good: '#22c55e',      // Green 500 (50-74)
+                            mediocre: '#f97316',  // Orange 500 (25-49)
+                            bad: '#ef4444'        // Red 500 (0-24)
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        /* Donut transition */
+        .donut-segment {
+            transition: stroke-dasharray 0.5s ease-in-out, stroke-dashoffset 0.5s ease-in-out;
+        }
+        /* Custom range slider */
+        input[type=range] {
+            accent-color: #6366f1;
+        }
+        .fade-in {
+            animation: fadeIn 0.25s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .nutriscore-badge {
+            font-family: 'Inter', sans-serif;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+        /* Yuka Camera Laser Animation */
+        @keyframes scanLaser {
+            0% { top: 10%; opacity: 0.85; }
+            50% { top: 88%; opacity: 1; }
+            100% { top: 10%; opacity: 0.85; }
+        }
+        .scanner-laser {
+            position: absolute;
+            left: 8%;
+            right: 8%;
+            height: 2.5px;
+            background: linear-gradient(90deg, transparent, #10b981, #ef4444, #10b981, transparent);
+            box-shadow: 0 0 12px 2px rgba(16, 185, 129, 0.75);
+            animation: scanLaser 2.2s infinite ease-in-out;
+            pointer-events: none;
+            z-index: 20;
+        }
+        /* Clean up html5-qrcode default internal borders */
+        #camera-reader video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+            border-radius: 0.75rem;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+                    <i class="fa-solid fa-carrot text-lg"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-xl font-extrabold tracking-tight text-slate-900">NutriTrack <span class="text-emerald-600">Pro</span></h1>
+                        <span class="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700 border border-orange-200">
+                            <i class="fa-solid fa-carrot text-orange-500"></i> Base Yuka & Scan Caméra
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 hidden sm:block">Calculateur de besoins, macros, scan code-barres & analyse Yuka</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-1.5 sm:gap-2.5">
+                <button onclick="openCameraScannerModal()" class="inline-flex items-center px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-sm shadow-emerald-500/20 transition-all active:scale-95">
+                    <i class="fa-solid fa-camera mr-1.5"></i>
+                    <span>Scanner avec la caméra</span>
+                </button>
+                <button onclick="openYukaSearchModal()" class="inline-flex items-center px-3 py-2 text-xs sm:text-sm font-bold rounded-xl text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 transition-all active:scale-95">
+                    <i class="fa-solid fa-magnifying-glass mr-1.5"></i>
+                    <span class="hidden sm:inline">Base Yuka</span>
+                </button>
+                <button onclick="generateTypicalDay()" class="inline-flex items-center px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-sm shadow-indigo-500/20 transition-all active:scale-95">
+                    <i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i>
+                    <span class="hidden lg:inline">Journée type</span>
+                    <span class="lg:hidden">Auto</span>
+                </button>
+                <button onclick="openResetModal()" class="inline-flex items-center px-3 py-2 text-xs sm:text-sm font-medium rounded-xl text-slate-600 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 transition-colors" title="Réinitialiser la journée">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        
+        <!-- Top Alert / Notification Toast -->
+        <div id="toast" class="fixed bottom-5 right-5 z-50 hidden transform transition-all duration-300">
+            <div class="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center space-x-3 border border-slate-700">
+                <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400"></i>
+                <span id="toast-message" class="text-sm font-medium">Action effectuée</span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            <!-- LEFT COLUMN: Profile Calculator, Macro Config & Yuka Legend (4 cols on desktop) -->
+            <div class="lg:col-span-4 space-y-6">
+                
+                <!-- Card 1: Calculateur BMR / TDEE -->
+                <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <div class="flex items-center space-x-2.5">
+                            <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                                <i class="fa-solid fa-calculator text-sm"></i>
+                            </div>
+                            <h2 class="font-bold text-slate-800 text-base">Profil & Besoins (Mifflin-St Jeor)</h2>
+                        </div>
+                        <span class="text-xs font-medium px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full" id="bmr-badge">BMR: -- kcal</span>
+                    </div>
+
+                    <div class="p-5 space-y-4">
+                        <!-- Sexe -->
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Sexe biologique</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <button type="button" id="btn-gender-male" onclick="setGender('male')" class="py-2.5 px-4 rounded-xl border text-sm font-semibold flex items-center justify-center space-x-2 transition-all">
+                                    <i class="fa-solid fa-mars"></i>
+                                    <span>Homme</span>
+                                </button>
+                                <button type="button" id="btn-gender-female" onclick="setGender('female')" class="py-2.5 px-4 rounded-xl border text-sm font-semibold flex items-center justify-center space-x-2 transition-all">
+                                    <i class="fa-solid fa-venus"></i>
+                                    <span>Femme</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Age, Poids, Taille -->
+                        <div class="grid grid-cols-3 gap-3">
+                            <div>
+                                <label for="input-age" class="block text-xs font-semibold text-slate-600 mb-1">Âge (ans)</label>
+                                <input type="number" id="input-age" min="14" max="100" oninput="updateProfileFromInputs()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                            </div>
+                            <div>
+                                <label for="input-weight" class="block text-xs font-semibold text-slate-600 mb-1">Poids (kg)</label>
+                                <input type="number" id="input-weight" min="35" max="250" step="0.5" oninput="updateProfileFromInputs()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                            </div>
+                            <div>
+                                <label for="input-height" class="block text-xs font-semibold text-slate-600 mb-1">Taille (cm)</label>
+                                <input type="number" id="input-height" min="120" max="230" oninput="updateProfileFromInputs()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                            </div>
+                        </div>
+
+                        <!-- Niveau d'activité -->
+                        <div>
+                            <label for="select-activity" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Niveau d'activité physique</label>
+                            <select id="select-activity" onchange="updateProfileFromInputs()" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                                <option value="1.2">Sédentaire (Bureau, peu ou pas de sport)</option>
+                                <option value="1.375">Légèrement actif (1 à 2 séances / sem.)</option>
+                                <option value="1.55">Modérément actif (Course / Cross-training 3-4x/sem)</option>
+                                <option value="1.725">Très actif (Sport intense 5-6x / sem.)</option>
+                                <option value="1.9">Extrêmement actif (Athlète / Biquotidien / Métier physique)</option>
+                            </select>
+                        </div>
+
+                        <!-- Objectif -->
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Objectif nutritionnel</label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button type="button" id="btn-goal-cut" onclick="setGoal('cut')" class="p-2.5 rounded-xl border text-center transition-all flex flex-col items-center">
+                                    <i class="fa-solid fa-fire-flame-simple text-rose-500 mb-1"></i>
+                                    <span class="text-xs font-bold block">Sèche / Perte</span>
+                                    <span class="text-[10px] text-slate-400">-20% kcal</span>
+                                </button>
+                                <button type="button" id="btn-goal-maintain" onclick="setGoal('maintain')" class="p-2.5 rounded-xl border text-center transition-all flex flex-col items-center">
+                                    <i class="fa-solid fa-scale-balanced text-emerald-500 mb-1"></i>
+                                    <span class="text-xs font-bold block">Maintien</span>
+                                    <span class="text-[10px] text-slate-400">100% TDEE</span>
+                                </button>
+                                <button type="button" id="btn-goal-bulk" onclick="setGoal('bulk')" class="p-2.5 rounded-xl border text-center transition-all flex flex-col items-center">
+                                    <i class="fa-solid fa-dumbbell text-indigo-500 mb-1"></i>
+                                    <span class="text-xs font-bold block">Masse / Perf.</span>
+                                    <span class="text-[10px] text-slate-400">+12% kcal</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Résumé Métabolisme -->
+                        <div class="pt-2 border-t border-slate-100 grid grid-cols-2 gap-3 text-center">
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                <span class="text-[11px] font-medium text-slate-500 block">Maintenance (TDEE)</span>
+                                <span class="text-sm font-bold text-slate-800" id="tdee-display">2400 kcal</span>
+                            </div>
+                            <div class="bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-200/60">
+                                <span class="text-[11px] font-medium text-emerald-700 block">Cible Quotidienne</span>
+                                <span class="text-base font-extrabold text-emerald-600" id="target-cal-display">2400 kcal</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Card 2: Répartition des Macronutriments -->
+                <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <div class="flex items-center space-x-2.5">
+                            <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
+                                <i class="fa-solid fa-chart-pie text-sm"></i>
+                            </div>
+                            <h2 class="font-bold text-slate-800 text-base">Répartition des Macros</h2>
+                        </div>
+                        <span id="macro-sum-badge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">Total: 100%</span>
+                    </div>
+
+                    <div class="p-5 space-y-4">
+                        <!-- Profils préconfigurés -->
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Profils préconfigurés</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button type="button" onclick="applyMacroPreset('balanced')" id="preset-balanced" class="px-3 py-2 rounded-xl border text-left transition-all">
+                                    <div class="text-xs font-bold text-slate-800">Équilibré</div>
+                                    <div class="text-[10px] text-slate-500">P: 25% • G: 45% • L: 30%</div>
+                                </button>
+                                <button type="button" onclick="applyMacroPreset('sport')" id="preset-sport" class="px-3 py-2 rounded-xl border text-left transition-all">
+                                    <div class="text-xs font-bold text-slate-800">Sport / Cross-Train</div>
+                                    <div class="text-[10px] text-slate-500">P: 30% • G: 45% • L: 25%</div>
+                                </button>
+                                <button type="button" onclick="applyMacroPreset('highpro')" id="preset-highpro" class="px-3 py-2 rounded-xl border text-left transition-all">
+                                    <div class="text-xs font-bold text-slate-800">Riche en Protéines</div>
+                                    <div class="text-[10px] text-slate-500">P: 35% • G: 40% • L: 25%</div>
+                                </button>
+                                <button type="button" onclick="applyMacroPreset('lowcarb')" id="preset-lowcarb" class="px-3 py-2 rounded-xl border text-left transition-all">
+                                    <div class="text-xs font-bold text-slate-800">Low Carb</div>
+                                    <div class="text-[10px] text-slate-500">P: 35% • G: 25% • L: 40%</div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Curseurs personnalisables -->
+                        <div class="space-y-3 pt-2">
+                            <!-- Protéines -->
+                            <div>
+                                <div class="flex justify-between text-xs font-semibold mb-1">
+                                    <span class="flex items-center text-indigo-600"><span class="w-2.5 h-2.5 rounded-full bg-indigo-500 mr-1.5"></span>Protéines (4 kcal/g)</span>
+                                    <span class="text-slate-700"><span id="label-pct-pro">30</span>% (<span id="label-g-pro">180</span>g • <span id="label-gkg-pro" class="text-slate-400">2.2g/kg</span>)</span>
+                                </div>
+                                <input type="range" id="slider-pro" min="10" max="60" step="5" oninput="adjustMacroSliders('pro')" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer">
+                            </div>
+
+                            <!-- Glucides -->
+                            <div>
+                                <div class="flex justify-between text-xs font-semibold mb-1">
+                                    <span class="flex items-center text-amber-600"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 mr-1.5"></span>Glucides (4 kcal/g)</span>
+                                    <span class="text-slate-700"><span id="label-pct-carb">45</span>% (<span id="label-g-carb">270</span>g)</span>
+                                </div>
+                                <input type="range" id="slider-carb" min="10" max="70" step="5" oninput="adjustMacroSliders('carb')" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer accent-amber-500">
+                            </div>
+
+                            <!-- Lipides -->
+                            <div>
+                                <div class="flex justify-between text-xs font-semibold mb-1">
+                                    <span class="flex items-center text-rose-600"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 mr-1.5"></span>Lipides (9 kcal/g)</span>
+                                    <span class="text-slate-700"><span id="label-pct-fat">25</span>% (<span id="label-g-fat">67</span>g)</span>
+                                </div>
+                                <input type="range" id="slider-fat" min="15" max="60" step="5" oninput="adjustMacroSliders('fat')" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer accent-rose-500">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Card 3: Méthodologie Score Yuka -->
+                <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-7 h-7 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
+                                <i class="fa-solid fa-carrot text-xs"></i>
+                            </div>
+                            <h3 class="font-bold text-slate-800 text-sm">Indice Qualité Yuka (/100)</h3>
+                        </div>
+                        <span class="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 bg-slate-100 text-slate-600 rounded">Méthode Officielle</span>
+                    </div>
+                    <p class="text-xs text-slate-500 leading-relaxed mb-3">
+                        Chaque aliment de la base est évalué selon les 3 critères Yuka : <strong>Qualité nutritionnelle (60%)</strong> basée sur le Nutri-Score, <strong>Présence d'additifs (30%)</strong> et <strong>Label Bio (10%)</strong>.
+                    </p>
+                    <div class="grid grid-cols-2 gap-2 text-[11px] font-semibold">
+                        <div class="flex items-center gap-2 p-2 rounded-lg bg-emerald-50/70 border border-emerald-100 text-emerald-900">
+                            <span class="w-3 h-3 rounded-full bg-green-700 shrink-0"></span>
+                            <span>75–100 : Excellent</span>
+                        </div>
+                        <div class="flex items-center gap-2 p-2 rounded-lg bg-green-50/70 border border-green-100 text-green-900">
+                            <span class="w-3 h-3 rounded-full bg-green-500 shrink-0"></span>
+                            <span>50–74 : Bon</span>
+                        </div>
+                        <div class="flex items-center gap-2 p-2 rounded-lg bg-orange-50/70 border border-orange-100 text-orange-900">
+                            <span class="w-3 h-3 rounded-full bg-orange-500 shrink-0"></span>
+                            <span>25–49 : Médiocre</span>
+                        </div>
+                        <div class="flex items-center gap-2 p-2 rounded-lg bg-rose-50/70 border border-rose-100 text-rose-900">
+                            <span class="w-3 h-3 rounded-full bg-red-500 shrink-0"></span>
+                            <span>0–24 : Mauvais</span>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- RIGHT COLUMN: Dashboard, Yuka Food Selector & Meal Planner (8 cols on desktop) -->
+            <div class="lg:col-span-8 space-y-6">
+
+                <!-- Section 1: Tableau de Bord, Jauges & Score Yuka Quotidien -->
+                <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 sm:p-6">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-100">
+                        <div>
+                            <h2 class="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                                <i class="fa-solid fa-gauge-high text-emerald-500"></i>
+                                <span>Tableau de Bord & Qualité Yuka</span>
+                            </h2>
+                            <p class="text-xs text-slate-500">Suivi en temps réel de vos apports en macronutriments et de la qualité santé de vos repas</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <!-- Daily Yuka Score Pill -->
+                            <div id="daily-yuka-pill" class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-900 shadow-2xs">
+                                <span id="daily-yuka-dot" class="w-3 h-3 rounded-full bg-green-700"></span>
+                                <span>Score Yuka Jour : <strong id="daily-yuka-score">--/100</strong> (<span id="daily-yuka-label">--</span>)</span>
+                            </div>
+                            <div id="status-pill" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700">
+                                <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                                <span>En cours</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 pt-5 items-center">
+                        
+                        <!-- Gauges Bars (7 cols) -->
+                        <div class="md:col-span-7 space-y-4">
+                            
+                            <!-- Calories Main Bar -->
+                            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                <div class="flex justify-between items-baseline mb-2">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs">
+                                            <i class="fa-solid fa-fire"></i>
+                                        </span>
+                                        <div>
+                                            <span class="font-bold text-sm text-slate-800">Énergie Totale</span>
+                                            <span id="cal-remaining-text" class="text-xs text-slate-500 block">Reste 2400 kcal</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <span id="consumed-cal" class="text-xl font-extrabold text-emerald-600">0</span>
+                                        <span class="text-xs font-semibold text-slate-400">/ <span id="goal-cal">2400</span> kcal</span>
+                                    </div>
+                                </div>
+                                <div class="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+                                    <div id="bar-cal" class="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <!-- 3 Macro Progress Cards -->
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <!-- Protéines -->
+                                <div class="p-3.5 rounded-xl border border-indigo-100 bg-indigo-50/30">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                                            <i class="fa-solid fa-drumstick-bite text-indigo-500"></i> Protéines
+                                        </span>
+                                        <span id="pct-bar-pro" class="text-[11px] font-bold text-indigo-600">0%</span>
+                                    </div>
+                                    <div class="text-sm font-extrabold text-slate-800 mb-2">
+                                        <span id="consumed-pro">0</span> <span class="text-xs font-normal text-slate-500">/ <span id="goal-pro">180</span>g</span>
+                                    </div>
+                                    <div class="w-full h-2 bg-indigo-100 rounded-full overflow-hidden">
+                                        <div id="bar-pro" class="h-full bg-indigo-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Glucides -->
+                                <div class="p-3.5 rounded-xl border border-amber-100 bg-amber-50/30">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                                            <i class="fa-solid fa-wheat-awn text-amber-500"></i> Glucides
+                                        </span>
+                                        <span id="pct-bar-carb" class="text-[11px] font-bold text-amber-600">0%</span>
+                                    </div>
+                                    <div class="text-sm font-extrabold text-slate-800 mb-2">
+                                        <span id="consumed-carb">0</span> <span class="text-xs font-normal text-slate-500">/ <span id="goal-carb">270</span>g</span>
+                                    </div>
+                                    <div class="w-full h-2 bg-amber-100 rounded-full overflow-hidden">
+                                        <div id="bar-carb" class="h-full bg-amber-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Lipides -->
+                                <div class="p-3.5 rounded-xl border border-rose-100 bg-rose-50/30">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-xs font-bold text-rose-950 flex items-center gap-1.5">
+                                            <i class="fa-solid fa-droplet text-rose-500"></i> Lipides
+                                        </span>
+                                        <span id="pct-bar-fat" class="text-[11px] font-bold text-rose-600">0%</span>
+                                    </div>
+                                    <div class="text-sm font-extrabold text-slate-800 mb-2">
+                                        <span id="consumed-fat">0</span> <span class="text-xs font-normal text-slate-500">/ <span id="goal-fat">67</span>g</span>
+                                    </div>
+                                    <div class="w-full h-2 bg-rose-100 rounded-full overflow-hidden">
+                                        <div id="bar-fat" class="h-full bg-rose-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Yuka Quality Summary Bar -->
+                            <div class="px-4 py-3 rounded-xl bg-slate-50 border border-slate-200/70 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                <div class="flex items-center space-x-2">
+                                    <i class="fa-solid fa-shield-heart text-emerald-600"></i>
+                                    <span class="font-semibold text-slate-700">Bilan Qualité Yuka :</span>
+                                    <span id="yuka-summary-details" class="text-slate-500">0% d'aliments Excellents/Bons • 0 additif à risque</span>
+                                </div>
+                                <span id="bio-count-badge" class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px]">0 produit Bio</span>
+                            </div>
+
+                        </div>
+
+                        <!-- Donut Chart SVG (5 cols) -->
+                        <div class="md:col-span-5 flex flex-col items-center justify-center bg-slate-50/70 rounded-2xl p-4 border border-slate-100">
+                            <div class="relative w-40 h-40 flex items-center justify-center">
+                                <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                    <!-- Background Circle -->
+                                    <circle cx="18" cy="18" r="15.91549430918954" fill="transparent" stroke="#e2e8f0" stroke-width="3.8"></circle>
+                                    <!-- Protein Segment -->
+                                    <circle id="donut-pro" class="donut-segment" cx="18" cy="18" r="15.91549430918954" fill="transparent" stroke="#6366f1" stroke-width="3.8" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>
+                                    <!-- Carb Segment -->
+                                    <circle id="donut-carb" class="donut-segment" cx="18" cy="18" r="15.91549430918954" fill="transparent" stroke="#f59e0b" stroke-width="3.8" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>
+                                    <!-- Fat Segment -->
+                                    <circle id="donut-fat" class="donut-segment" cx="18" cy="18" r="15.91549430918954" fill="transparent" stroke="#f43f5e" stroke-width="3.8" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>
+                                </svg>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+                                    <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Répartition</span>
+                                    <span id="donut-center-cal" class="text-lg font-extrabold text-slate-800">0 kcal</span>
+                                    <span id="donut-center-sub" class="text-[10px] font-medium text-slate-500">Réelle (% kcal)</span>
+                                </div>
+                            </div>
+
+                            <!-- Legend with actual % and grams -->
+                            <div class="grid grid-cols-3 gap-2 w-full mt-3 pt-3 border-t border-slate-200/70 text-center">
+                                <div>
+                                    <div class="flex items-center justify-center space-x-1 text-xs font-bold text-indigo-600">
+                                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                        <span id="actual-pct-pro">0%</span>
+                                    </div>
+                                    <span class="text-[10px] text-slate-500 block">Protéines</span>
+                                </div>
+                                <div>
+                                    <div class="flex items-center justify-center space-x-1 text-xs font-bold text-amber-600">
+                                        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                        <span id="actual-pct-carb">0%</span>
+                                    </div>
+                                    <span class="text-[10px] text-slate-500 block">Glucides</span>
+                                </div>
+                                <div>
+                                    <div class="flex items-center justify-center space-x-1 text-xs font-bold text-rose-600">
+                                        <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                                        <span id="actual-pct-fat">0%</span>
+                                    </div>
+                                    <span class="text-[10px] text-slate-500 block">Lipides</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- Section 2: Sélecteur d'Aliments Enrichi Yuka & Filtres Qualité -->
+                <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                                <i class="fa-solid fa-carrot text-orange-500"></i>
+                                <span>Catalogue Yuka & Ajout Rapide aux Repas</span>
+                                <span id="catalog-count-badge" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">75+ produits</span>
+                            </h3>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" onclick="openCameraScannerModal()" class="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs px-3 py-1.5 rounded-xl transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-camera"></i>
+                                <span>Scanner code-barres</span>
+                            </button>
+                            <button type="button" onclick="openYukaSearchModal()" class="text-xs font-bold text-orange-700 hover:text-orange-800 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3 py-1.5 rounded-xl transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-magnifying-glass-plus"></i>
+                                <span>Base OpenFoodFacts</span>
+                            </button>
+                            <button type="button" onclick="toggleCustomFoodDrawer()" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-plus-circle"></i>
+                                <span class="hidden sm:inline">Créer aliment</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Yuka Smart Filters Bar -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3.5 p-2.5 bg-slate-50 rounded-xl border border-slate-200/60">
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Catégorie</label>
+                            <select id="filter-category" onchange="onFilterChange()" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="all">Toutes les catégories</option>
+                                <option value="Céréales & Féculents">🌾 Céréales & Féculents</option>
+                                <option value="Viandes & Poissons">🍗 Viandes & Poissons</option>
+                                <option value="Œufs & Produits laitiers">🥛 Produits laitiers & Œufs</option>
+                                <option value="Protéines végétales">🌱 Protéines végétales</option>
+                                <option value="Légumineuses">🫘 Légumineuses</option>
+                                <option value="Fruits & Légumes">🥦 Fruits & Légumes</option>
+                                <option value="Lipides & Oléagineux">🥑 Lipides & Oléagineux</option>
+                                <option value="Snacks & Supermarché">🛒 Produits Supermarché</option>
+                                <option value="Compléments">⚡ Compléments Sport</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Score Yuka Minimum</label>
+                            <select id="filter-yuka" onchange="onFilterChange()" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="0">Tous les scores (0-100)</option>
+                                <option value="75">🟢 Excellent uniquement (≥ 75/100)</option>
+                                <option value="50">🟢 Bon ou Excellent (≥ 50/100)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Trier par</label>
+                            <select id="filter-sort" onchange="onFilterChange()" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="yuka_desc">⭐ Meilleur Score Yuka</option>
+                                <option value="pro_desc">💪 Plus riche en Protéines</option>
+                                <option value="cal_asc">🍃 Moins calorique</option>
+                                <option value="name_asc">🔤 Ordre alphabétique</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button type="button" id="btn-filter-bio" onclick="toggleBioFilter()" class="w-full py-1.5 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-50 transition">
+                                <i class="fa-solid fa-seedling text-emerald-600"></i>
+                                <span>Bio uniquement</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search & Add Controls -->
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                        
+                        <!-- Food Selector with Live Filter -->
+                        <div class="sm:col-span-5 relative">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Rechercher un aliment ou une marque (ex: Skyr Danone, Bjorg, Fleury Michon...)</label>
+                            <div class="relative">
+                                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                                <input type="text" id="food-search-input" placeholder="Tapez un aliment ou cliquez pour parcourir..." onfocus="showFoodDropdown()" oninput="filterFoodDropdown()" class="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white">
+                                <button type="button" onclick="clearFoodSearch()" id="clear-search-btn" class="hidden absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600">
+                                    <i class="fa-solid fa-circle-xmark"></i>
+                                </button>
+                            </div>
+                            <!-- Dropdown list -->
+                            <div id="food-dropdown" class="hidden absolute left-0 right-0 mt-1 max-h-72 overflow-y-auto bg-white rounded-xl shadow-2xl border border-slate-200 z-40 divide-y divide-slate-100">
+                                <!-- Populated via JS -->
+                            </div>
+                        </div>
+
+                        <!-- Quantity (g) -->
+                        <div class="sm:col-span-2">
+                            <label for="add-food-qty" class="block text-xs font-semibold text-slate-600 mb-1">Quantité (g)</label>
+                            <input type="number" id="add-food-qty" value="100" min="1" max="2000" step="5" oninput="updateSelectedFoodPreview()" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white">
+                        </div>
+
+                        <!-- Target Meal -->
+                        <div class="sm:col-span-3">
+                            <label for="add-food-meal" class="block text-xs font-semibold text-slate-600 mb-1">Repas cible</label>
+                            <select id="add-food-meal" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white">
+                                <option value="breakfast">☀️ Petit-déjeuner</option>
+                                <option value="lunch">🍽️ Déjeuner</option>
+                                <option value="dinner">🌙 Dîner</option>
+                                <option value="snack">⚡ Collation / Post-training</option>
+                            </select>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="sm:col-span-2">
+                            <button type="button" onclick="addSelectedFoodToMeal()" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm rounded-xl shadow-sm shadow-emerald-500/20 transition flex items-center justify-center gap-1.5 active:scale-95">
+                                <i class="fa-solid fa-plus"></i>
+                                <span>Ajouter</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Live Nutritional & Yuka Preview of Selected Food -->
+                    <div id="selected-food-preview" class="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-2.5">
+                        <div class="flex items-center gap-2.5 flex-wrap" id="preview-food-name">
+                            <span class="font-medium text-slate-600">Sélectionnez un aliment ci-dessus pour voir son analyse Yuka</span>
+                        </div>
+                        <div class="flex items-center space-x-2 font-semibold shrink-0" id="preview-food-macros">
+                            <span class="text-emerald-600">-- kcal</span>
+                            <span class="text-indigo-600">P: --g</span>
+                            <span class="text-amber-600">G: --g</span>
+                            <span class="text-rose-600">L: --g</span>
+                        </div>
+                    </div>
+
+                    <!-- Collapsible Custom Food Creator Form -->
+                    <div id="custom-food-drawer" class="hidden mt-4 pt-4 border-t border-slate-200 fade-in">
+                        <div class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-bowl-food text-indigo-600"></i>
+                                    Nouvel aliment personnalisé (Valeurs pour 100g + Score Yuka)
+                                </h4>
+                                <button type="button" onclick="toggleCustomFoodDrawer()" class="text-slate-400 hover:text-slate-600 text-xs">
+                                    <i class="fa-solid fa-xmark"></i> Fermer
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-2 sm:grid-cols-7 gap-2.5 items-end">
+                                <div class="col-span-2">
+                                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">Nom & Marque</label>
+                                    <input type="text" id="custom-name" placeholder="Ex: Muesli Bio Bjorg" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-emerald-700 mb-1">Calories</label>
+                                    <input type="number" id="custom-cal" placeholder="360" min="0" class="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-indigo-700 mb-1">Protéines (g)</label>
+                                    <input type="number" id="custom-pro" placeholder="14" min="0" step="0.1" class="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-amber-700 mb-1">Glucides (g)</label>
+                                    <input type="number" id="custom-carb" placeholder="58" min="0" step="0.1" class="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-rose-700 mb-1">Lipides (g)</label>
+                                    <input type="number" id="custom-fat" placeholder="7" min="0" step="0.1" class="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-orange-700 mb-1">Yuka (/100)</label>
+                                    <input type="number" id="custom-yuka" placeholder="85" value="80" min="0" max="100" class="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                </div>
+                            </div>
+                            <div class="mt-3 flex items-center justify-between">
+                                <label class="inline-flex items-center gap-2 text-xs font-semibold text-emerald-800 cursor-pointer">
+                                    <input type="checkbox" id="custom-bio" class="rounded text-emerald-600 focus:ring-emerald-500">
+                                    <span>Produit issu de l'Agriculture Biologique (Bonus Bio +10 pts)</span>
+                                </label>
+                                <button type="button" onclick="saveCustomFood()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm transition">
+                                    <i class="fa-solid fa-check mr-1"></i> Enregistrer & Sélectionner
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 3: Planificateur des 4 Repas de la Journée -->
+                <section class="grid grid-cols-1 md:grid-cols-2 gap-5" id="meals-container">
+                    <!-- Populated dynamically via JS for Breakfast, Lunch, Dinner, Snack -->
+                </section>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL 1: Recherche Live Base Yuka / Open Food Facts -->
+    <div id="yuka-search-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[88vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden fade-in">
+            <!-- Modal Header -->
+            <div class="p-4 sm:p-5 bg-gradient-to-r from-orange-50 via-white to-emerald-50 border-b border-slate-200 flex items-center justify-between gap-2">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-sm shrink-0">
+                        <i class="fa-solid fa-carrot text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base sm:text-lg font-extrabold text-slate-900">Recherche Directe Base Yuka / Open Food Facts</h3>
+                        <p class="text-xs text-slate-500">Explorez des milliers de produits vendus en France avec calcul automatique du Score Yuka (/100)</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" onclick="closeYukaSearchModal(); openCameraScannerModal();" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition">
+                        <i class="fa-solid fa-camera"></i>
+                        <span class="hidden sm:inline">Scanner avec la caméra</span>
+                    </button>
+                    <button type="button" onclick="closeYukaSearchModal()" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search Controls -->
+            <div class="p-4 border-b border-slate-100 bg-slate-50/60 space-y-3">
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <div class="relative flex-grow">
+                        <i class="fa-solid fa-barcode absolute left-3.5 top-3 text-slate-400 text-sm"></i>
+                        <input type="text" id="off-live-query" onkeydown="if(event.key==='Enter') searchOpenFoodFactsLive()" placeholder="Nom du produit, marque ou code-barres (ex: Skyr Danone, Muesli Bjorg, 3017620422003...)" class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                    </div>
+                    <button type="button" onclick="searchOpenFoodFactsLive()" id="btn-off-search" class="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm rounded-xl shadow-sm transition flex items-center justify-center gap-2 shrink-0">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <span>Rechercher</span>
+                    </button>
+                </div>
+                <!-- Quick search suggestions -->
+                <div class="flex items-center gap-1.5 flex-wrap text-xs">
+                    <span class="text-slate-400 font-semibold text-[11px]">Suggestions populaires :</span>
+                    <button type="button" onclick="quickOffSearch('Skyr Danone')" class="px-2.5 py-1 bg-white hover:bg-orange-50 border border-slate-200 rounded-lg text-slate-700 font-medium transition">Skyr Danone</button>
+                    <button type="button" onclick="quickOffSearch('Flocons avoine Bjorg')" class="px-2.5 py-1 bg-white hover:bg-orange-50 border border-slate-200 rounded-lg text-slate-700 font-medium transition">Avoine Bjorg</button>
+                    <button type="button" onclick="quickOffSearch('Blanc de poulet Fleury Michon')" class="px-2.5 py-1 bg-white hover:bg-orange-50 border border-slate-200 rounded-lg text-slate-700 font-medium transition">Poulet Fleury Michon</button>
+                    <button type="button" onclick="quickOffSearch('Pain complet Harrys')" class="px-2.5 py-1 bg-white hover:bg-orange-50 border border-slate-200 rounded-lg text-slate-700 font-medium transition">Pain Harrys</button>
+                    <button type="button" onclick="quickOffSearch('Chocolat Lindt 85%')" class="px-2.5 py-1 bg-white hover:bg-orange-50 border border-slate-200 rounded-lg text-slate-700 font-medium transition">Lindt 85%</button>
+                    <button type="button" onclick="quickOffSearch('Tofu Soy')" class="px-2.5 py-1 bg-white hover:bg-orange-50 border border-slate-200 rounded-lg text-slate-700 font-medium transition">Tofu Soy</button>
+                </div>
+            </div>
+
+            <!-- Results List -->
+            <div id="off-results-container" class="p-4 overflow-y-auto flex-grow space-y-2.5 bg-slate-50/30">
+                <!-- Populated dynamically -->
+            </div>
+
+            <!-- Modal Footer with Target Meal & Grams -->
+            <div class="p-3.5 bg-white border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div class="flex items-center gap-2">
+                    <span class="font-semibold text-slate-600">Destination lors de l'ajout :</span>
+                    <select id="off-modal-meal" class="px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-800">
+                        <option value="breakfast">☀️ Petit-déjeuner</option>
+                        <option value="lunch">🍽️ Déjeuner</option>
+                        <option value="dinner">🌙 Dîner</option>
+                        <option value="snack">⚡ Collation</option>
+                    </select>
+                    <div class="flex items-center gap-1">
+                        <input type="number" id="off-modal-grams" value="100" min="5" max="1000" step="5" class="w-16 px-2 py-1.5 bg-slate-100 border border-slate-200 rounded-lg font-bold text-center text-slate-800">
+                        <span class="text-slate-500 font-semibold">g</span>
+                    </div>
+                </div>
+                <span class="text-[11px] text-slate-400">Données issues d'Open Food Facts France & algorithme Yuka</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Scanner Code-Barres par Caméra en Direct & Fiche Produit Yuka -->
+    <div id="camera-scanner-modal" class="fixed inset-0 bg-slate-900/75 backdrop-blur-xs z-50 hidden items-center justify-center p-3 sm:p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden fade-in">
+            
+            <!-- Scanner Modal Header -->
+            <div class="p-4 bg-gradient-to-r from-emerald-600 via-teal-600 to-slate-900 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-xs flex items-center justify-center text-white border border-white/20">
+                        <i class="fa-solid fa-barcode text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-base font-extrabold tracking-tight">Scanner Code-Barres Yuka Live</h3>
+                            <span id="scanner-engine-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-400/20 text-emerald-200 border border-emerald-400/30">
+                                Caméra HD
+                            </span>
+                        </div>
+                        <p class="text-xs text-emerald-100/80">Placez le code-barres (EAN-13 / EAN-8) dans le cadre ou importez une photo</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeCameraScannerModal()" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Scanner Modal Body -->
+            <div class="p-4 sm:p-5 overflow-y-auto flex-grow space-y-4 bg-slate-50/60">
+                
+                <!-- Camera Controls Bar -->
+                <div id="scanner-controls-bar" class="flex flex-wrap items-center justify-between gap-2 bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+                    <div class="flex items-center gap-2 flex-1 min-w-[180px]">
+                        <i class="fa-solid fa-video text-emerald-600 text-xs ml-1"></i>
+                        <select id="camera-select" onchange="switchCameraDevice(this.value)" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="environment">Caméra arrière (Recommandé)</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button type="button" onclick="flipCameraFacingMode()" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition" title="Inverser caméra avant/arrière">
+                            <i class="fa-solid fa-camera-rotate"></i>
+                            <span class="hidden sm:inline">Inverser</span>
+                        </button>
+                        <label for="barcode-file-input" class="cursor-pointer px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-image"></i>
+                            <span>Importer photo</span>
+                        </label>
+                        <input type="file" id="barcode-file-input" accept="image/*" class="hidden" onchange="handleBarcodeImageUpload(event)">
+                    </div>
+                </div>
+
+                <!-- Live Video Viewport Container -->
+                <div id="scanner-viewport-wrapper" class="relative w-full h-64 sm:h-72 bg-slate-950 rounded-2xl overflow-hidden border-2 border-slate-800 shadow-inner flex items-center justify-center">
+                    <!-- html5-qrcode target div -->
+                    <div id="camera-reader" class="w-full h-full"></div>
+
+                    <!-- Native video fallback/override if needed -->
+                    <video id="native-camera-video" class="hidden w-full h-full object-cover" playsinline muted></video>
+
+                    <!-- Yuka Target Reticle & Animated Laser -->
+                    <div id="scanner-overlay-reticle" class="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+                        <div class="relative w-64 sm:w-72 h-40 sm:h-44 rounded-2xl border-2 border-white/30">
+                            <!-- Corner Markers -->
+                            <div class="absolute -top-0.5 -left-0.5 w-7 h-7 border-t-4 border-l-4 border-emerald-400 rounded-tl-xl"></div>
+                            <div class="absolute -top-0.5 -right-0.5 w-7 h-7 border-t-4 border-r-4 border-emerald-400 rounded-tr-xl"></div>
+                            <div class="absolute -bottom-0.5 -left-0.5 w-7 h-7 border-b-4 border-l-4 border-emerald-400 rounded-bl-xl"></div>
+                            <div class="absolute -bottom-0.5 -right-0.5 w-7 h-7 border-b-4 border-r-4 border-emerald-400 rounded-br-xl"></div>
+                            <!-- Animated Laser Line -->
+                            <div class="scanner-laser"></div>
+                        </div>
+                        <span id="scanner-status-pill" class="mt-3 px-3 py-1 rounded-full bg-slate-900/80 text-white text-[11px] font-semibold backdrop-blur-xs border border-white/15 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                            <span>Recherche d'un code-barres EAN-13...</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Manual Barcode Input & Instant Simulation Bar -->
+                <div id="scanner-simulation-panel" class="bg-white p-3.5 rounded-xl border border-slate-200 space-y-3">
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <div class="relative flex-grow">
+                            <i class="fa-solid fa-barcode absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                            <input type="text" id="manual-barcode-input" onkeydown="if(event.key==='Enter') triggerManualBarcodeLookup()" placeholder="Ou saisissez un code-barres (ex: 3033491485756)..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <button type="button" onclick="triggerManualBarcodeLookup()" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition shrink-0">
+                            Analyser le code
+                        </button>
+                    </div>
+
+                    <!-- Quick Simulation Buttons for testing without physical product -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                                <i class="fa-solid fa-bolt text-amber-500"></i>
+                                Simuler un scan immédiat (Test rapide) :
+                            </span>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                            <button type="button" onclick="simulateBarcodeScan('3033491485756')" class="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition group">
+                                <div class="text-[11px] font-bold text-slate-800 group-hover:text-emerald-800 truncate">Skyr Danone 0%</div>
+                                <div class="text-[9px] text-slate-400 font-mono">3033491485756</div>
+                            </button>
+                            <button type="button" onclick="simulateBarcodeScan('3229820129488')" class="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition group">
+                                <div class="text-[11px] font-bold text-slate-800 group-hover:text-emerald-800 truncate">Avoine Bio Bjorg</div>
+                                <div class="text-[9px] text-slate-400 font-mono">3229820129488</div>
+                            </button>
+                            <button type="button" onclick="simulateBarcodeScan('3046920022651')" class="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition group">
+                                <div class="text-[11px] font-bold text-slate-800 group-hover:text-emerald-800 truncate">Lindt Noir 85%</div>
+                                <div class="text-[9px] text-slate-400 font-mono">3046920022651</div>
+                            </button>
+                            <button type="button" onclick="simulateBarcodeScan('8076809513753')" class="p-2 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition group">
+                                <div class="text-[11px] font-bold text-slate-800 group-hover:text-emerald-800 truncate">Pâtes Barilla Compl.</div>
+                                <div class="text-[9px] text-slate-400 font-mono">8076809513753</div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scanned Product Detailed Yuka Card (Hidden until barcode detected) -->
+                <div id="scanned-product-card" class="hidden fade-in">
+                    <!-- Populated dynamically upon barcode scan -->
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Modal for Reset Confirmation -->
+    <div id="reset-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 fade-in">
+            <div class="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-xl mb-4">
+                <i class="fa-solid fa-trash-can"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 mb-1">Vider les repas du jour ?</h3>
+            <p class="text-xs text-slate-500 mb-5 leading-relaxed">
+                Tous les aliments ajoutés au Petit-déjeuner, Déjeuner, Dîner et Collations seront retirés. Votre profil et vos aliments personnalisés seront conservés.
+            </p>
+            <div class="flex items-center justify-end space-x-2.5">
+                <button type="button" onclick="closeResetModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">
+                    Annuler
+                </button>
+                <button type="button" onclick="confirmResetDay()" class="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 shadow-sm transition">
+                    Oui, réinitialiser
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200/80 mt-12 py-5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
+            <p>NutriTrack Pro • Équation Mifflin-St Jeor • Base Yuka & Open Food Facts France intégrée</p>
+            <p class="flex items-center gap-3">
+                <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-indigo-500"></span> 1g Protéine = 4 kcal</span>
+                <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span> 1g Glucide = 4 kcal</span>
+                <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-500"></span> 1g Lipide = 9 kcal</span>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Application Logic -->
+    <script>
+        // ==========================================
+        // 1. BASE DE DONNÉES YUKA ENRICHIE (75+ Aliments & Produits Supermarché FR)
+        // ==========================================
+        // Chaque aliment possède: id, name, brand, category, cal, pro, carb, fat, defaultPortion, yukaScore (0-100), nutriScore ('A'-'E'), additives (int), bio (bool)
+        const DEFAULT_FOODS = [
+            // --- CÉRÉALES, PAINS & FÉCULENTS ---
+            { id: 'avoine_bjorg', name: "Flocons d'avoine complète Bio", brand: "Bjorg", category: "Céréales & Féculents", cal: 372, pro: 13.5, carb: 58.7, fat: 7.0, defaultPortion: 70, yukaScore: 100, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'muesli_bjorg', name: "Muesli Sans Sucres Ajoutés Bio", brand: "Bjorg", category: "Céréales & Féculents", cal: 359, pro: 11.0, carb: 60.0, fat: 6.4, defaultPortion: 65, yukaScore: 90, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'son_avoine', name: "Son d'avoine Bio", brand: "Celnat", category: "Céréales & Féculents", cal: 351, pro: 16.0, carb: 48.0, fat: 7.0, defaultPortion: 40, yukaScore: 100, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'pain_complet', name: "Pain complet au levain", brand: "Boulangerie", category: "Céréales & Féculents", cal: 247, pro: 9.2, carb: 43.3, fat: 3.4, defaultPortion: 80, yukaScore: 86, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'pain_harrys', name: "Pain de mie 100% Mie Complet", brand: "Harrys", category: "Céréales & Féculents", cal: 256, pro: 9.5, carb: 42.0, fat: 4.3, defaultPortion: 75, yukaScore: 69, nutriScore: 'A', additives: 1, bio: false },
+            { id: 'pain_seigle_bio', name: "Pain de seigle complet Bio", brand: "Bjorg", category: "Céréales & Féculents", cal: 215, pro: 6.2, carb: 40.5, fat: 1.5, defaultPortion: 80, yukaScore: 94, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'wasa_fibres', name: "Tartines craquantes Fibres", brand: "Wasa", category: "Céréales & Féculents", cal: 334, pro: 11.0, carb: 54.5, fat: 3.0, defaultPortion: 40, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'riz_basmati', name: "Riz basmati (pesé cru)", brand: "Taureau Ailé", category: "Céréales & Féculents", cal: 350, pro: 8.5, carb: 77.0, fat: 1.0, defaultPortion: 80, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'riz_cuit', name: "Riz basmati (cuit)", brand: "Maison", category: "Céréales & Féculents", cal: 121, pro: 2.7, carb: 26.5, fat: 0.3, defaultPortion: 200, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'riz_complet_bio', name: "Riz complet (cuit) Bio", brand: "Jardin Bio", category: "Céréales & Féculents", cal: 132, pro: 3.1, carb: 27.5, fat: 1.1, defaultPortion: 200, yukaScore: 100, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'pates_completes', name: "Pâtes complètes Integrale (crues)", brand: "Barilla", category: "Céréales & Féculents", cal: 348, pro: 13.0, carb: 65.7, fat: 2.5, defaultPortion: 85, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'pates_cuites', name: "Pâtes blé complet (cuites)", brand: "Barilla", category: "Céréales & Féculents", cal: 135, pro: 5.2, carb: 26.0, fat: 0.9, defaultPortion: 200, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'patate_douce', name: "Patate douce (cuite au four/vapeur)", brand: "Marché", category: "Céréales & Féculents", cal: 86, pro: 1.6, carb: 20.1, fat: 0.1, defaultPortion: 220, yukaScore: 95, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'pomme_de_terre', name: "Pommes de terre vapeur", brand: "Marché", category: "Céréales & Féculents", cal: 82, pro: 2.0, carb: 18.0, fat: 0.1, defaultPortion: 220, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'quinoa_cuit', name: "Quinoa blanc & rouge (cuit) Bio", brand: "Quinola", category: "Céréales & Féculents", cal: 120, pro: 4.4, carb: 21.3, fat: 1.9, defaultPortion: 180, yukaScore: 100, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'boulgour_cuit', name: "Boulgour de blé (cuit)", brand: "Tipiak", category: "Céréales & Féculents", cal: 115, pro: 3.8, carb: 23.0, fat: 0.5, defaultPortion: 180, yukaScore: 88, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'sarrasin_cuit', name: "Sarrasin décortiqué (cuit) Bio", brand: "Markal", category: "Céréales & Féculents", cal: 110, pro: 4.2, carb: 21.5, fat: 0.8, defaultPortion: 180, yukaScore: 100, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'galettes_riz', name: "Galettes de riz complet Bio", brand: "Bjorg", category: "Céréales & Féculents", cal: 382, pro: 8.1, carb: 80.0, fat: 2.8, defaultPortion: 30, yukaScore: 84, nutriScore: 'A', additives: 0, bio: true },
+
+            // --- LÉGUMINEUSES ---
+            { id: 'lentilles_cuites', name: "Lentilles vertes du Puy (cuites)", brand: "Sabaton", category: "Légumineuses", cal: 116, pro: 9.0, carb: 20.0, fat: 0.4, defaultPortion: 180, yukaScore: 100, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'lentilles_corail', name: "Lentilles corail (cuites) Bio", brand: "Jardin Bio", category: "Légumineuses", cal: 118, pro: 8.8, carb: 19.5, fat: 0.6, defaultPortion: 180, yukaScore: 100, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'pois_chiches', name: "Pois chiches au naturel", brand: "Bonduelle", category: "Légumineuses", cal: 139, pro: 7.4, carb: 18.5, fat: 2.6, defaultPortion: 150, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'haricots_rouges', name: "Haricots rouges au naturel", brand: "Cassegrain", category: "Légumineuses", cal: 112, pro: 8.1, carb: 15.2, fat: 0.6, defaultPortion: 150, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'petits_pois', name: "Petits pois extra-fins", brand: "Cassegrain", category: "Légumineuses", cal: 78, pro: 5.1, carb: 10.5, fat: 0.6, defaultPortion: 160, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+
+            // --- VIANDES & POISSONS ---
+            { id: 'poulet', name: "Blanc de poulet fermier (cuit)", brand: "Loué", category: "Viandes & Poissons", cal: 165, pro: 31.0, carb: 0.0, fat: 3.6, defaultPortion: 150, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'poulet_fleury', name: "Blanc de poulet -25% de sel Sans Nitrite", brand: "Fleury Michon", category: "Viandes & Poissons", cal: 109, pro: 23.0, carb: 0.9, fat: 1.5, defaultPortion: 120, yukaScore: 76, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'dinde', name: "Filet de dinde rôti", brand: "Volailler", category: "Viandes & Poissons", cal: 135, pro: 29.0, carb: 0.0, fat: 1.7, defaultPortion: 150, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'jambon_sans_nitrite', name: "Jambon Supérieur Conservation Sans Nitrite", brand: "Fleury Michon", category: "Viandes & Poissons", cal: 114, pro: 21.0, carb: 0.8, fat: 2.8, defaultPortion: 90, yukaScore: 72, nutriScore: 'B', additives: 0, bio: false },
+            { id: 'boeuf_5', name: "Steak haché pur bœuf 5% MG", brand: "Charal", category: "Viandes & Poissons", cal: 129, pro: 21.5, carb: 0.0, fat: 5.0, defaultPortion: 130, yukaScore: 85, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'saumon', name: "Pavé de saumon Atlantique", brand: "Poissonnerie", category: "Viandes & Poissons", cal: 208, pro: 20.4, carb: 0.0, fat: 13.4, defaultPortion: 140, yukaScore: 82, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'saumon_fume', name: "Saumon fumé sauvage", brand: "Labeyrie", category: "Viandes & Poissons", cal: 175, pro: 23.0, carb: 0.5, fat: 9.0, defaultPortion: 80, yukaScore: 42, nutriScore: 'D', additives: 0, bio: false },
+            { id: 'cabillaud', name: "Dos de cabillaud sauvage", brand: "Picard", category: "Viandes & Poissons", cal: 82, pro: 18.0, carb: 0.0, fat: 0.7, defaultPortion: 160, yukaScore: 95, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'thon_naturel', name: "Thon entier au naturel", brand: "Petit Navire", category: "Viandes & Poissons", cal: 112, pro: 26.0, carb: 0.0, fat: 0.8, defaultPortion: 120, yukaScore: 86, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'maquereau_naturel', name: "Filets de maquereaux au naturel", brand: "Connétable", category: "Viandes & Poissons", cal: 185, pro: 22.0, carb: 0.0, fat: 11.0, defaultPortion: 120, yukaScore: 84, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'sardines_huile', name: "Sardines à l'huile d'olive vierge extra", brand: "Connétable", category: "Viandes & Poissons", cal: 222, pro: 23.5, carb: 0.0, fat: 14.2, defaultPortion: 100, yukaScore: 79, nutriScore: 'B', additives: 0, bio: false },
+            { id: 'crevettes', name: "Crevettes roses cuites", brand: "Poissonnerie", category: "Viandes & Poissons", cal: 94, pro: 20.5, carb: 0.5, fat: 1.1, defaultPortion: 120, yukaScore: 84, nutriScore: 'A', additives: 0, bio: false },
+
+            // --- PROTÉINES VÉGÉTALES ---
+            { id: 'tofu_ferme', name: "Tofu ferme nature Bio", brand: "Soy", category: "Protéines végétales", cal: 138, pro: 14.5, carb: 1.2, fat: 8.2, defaultPortion: 150, yukaScore: 100, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'tofu_fume', name: "Tofu fumé au bois de hêtre Bio", brand: "Taifun", category: "Protéines végétales", cal: 176, pro: 19.0, carb: 1.5, fat: 10.3, defaultPortion: 125, yukaScore: 94, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'tempeh_bio', name: "Tempeh de soja fermenté Bio", brand: "Soy", category: "Protéines végétales", cal: 192, pro: 20.0, carb: 7.5, fat: 9.0, defaultPortion: 120, yukaScore: 100, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'seitan_bio', name: "Seitan grillé aux céréales Bio", brand: "Céréal Bio", category: "Protéines végétales", cal: 162, pro: 24.5, carb: 8.2, fat: 3.1, defaultPortion: 130, yukaScore: 90, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'falafels_bio', name: "Falafels aux pois chiches Bio", brand: "Céréal Bio", category: "Protéines végétales", cal: 218, pro: 8.5, carb: 24.0, fat: 9.0, defaultPortion: 120, yukaScore: 85, nutriScore: 'A', additives: 0, bio: true },
+
+            // --- ŒUFS & PRODUITS LAITIERS ---
+            { id: 'oeufs', name: "Œufs frais Plein Air Bio (2 œufs ≈ 120g)", brand: "Loué Bio", category: "Œufs & Produits laitiers", cal: 143, pro: 12.6, carb: 0.7, fat: 9.5, defaultPortion: 120, yukaScore: 95, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'skyr_danone', name: "Skyr Nature 0% MG Riche en Protéines", brand: "Danone", category: "Œufs & Produits laitiers", cal: 57, pro: 9.5, carb: 3.8, fat: 0.2, defaultPortion: 150, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'fromage_blanc_0', name: "Fromage blanc 0% MG Nature", brand: "Calin / Yoplait", category: "Œufs & Produits laitiers", cal: 48, pro: 8.0, carb: 4.0, fat: 0.1, defaultPortion: 150, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'fromage_blanc_3', name: "Fromage blanc 3% MG de Campagne Bio", brand: "Les 2 Vaches", category: "Œufs & Produits laitiers", cal: 71, pro: 7.5, carb: 3.8, fat: 3.0, defaultPortion: 150, yukaScore: 95, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'petits_suisses', name: "Petits Suisses Nature 0%", brand: "Gervais", category: "Œufs & Produits laitiers", cal: 58, pro: 9.6, carb: 4.0, fat: 0.2, defaultPortion: 120, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'yaourt_soja', name: "Sojasun Nature Sans Sucres Ajoutés", brand: "Sojasun", category: "Œufs & Produits laitiers", cal: 46, pro: 4.6, carb: 1.0, fat: 2.3, defaultPortion: 125, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'lait_amande_bjorg', name: "Boisson Amande Sans Sucres Bio", brand: "Bjorg", category: "Œufs & Produits laitiers", cal: 22, pro: 0.7, carb: 0.2, fat: 1.9, defaultPortion: 200, yukaScore: 94, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'lait_avoine_oatly', name: "Boisson Avoine Bio", brand: "Oatly", category: "Œufs & Produits laitiers", cal: 46, pro: 1.0, carb: 6.7, fat: 1.5, defaultPortion: 200, yukaScore: 88, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'cottage_cheese', name: "Cottage Cheese Nature Riche en Protéines", brand: "Danone", category: "Œufs & Produits laitiers", cal: 95, pro: 12.0, carb: 2.5, fat: 4.0, defaultPortion: 120, yukaScore: 80, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'feta', name: "Feta AOP Grecque Traditionnelle", brand: "Salakis", category: "Œufs & Produits laitiers", cal: 264, pro: 14.2, carb: 4.1, fat: 21.3, defaultPortion: 40, yukaScore: 45, nutriScore: 'D', additives: 0, bio: false },
+            { id: 'comte_aop', name: "Comté AOP Affiné 12 mois", brand: "Juraflore", category: "Œufs & Produits laitiers", cal: 416, pro: 27.0, carb: 0.5, fat: 34.0, defaultPortion: 30, yukaScore: 48, nutriScore: 'D', additives: 0, bio: false },
+            { id: 'mozzarella_di_bufala', name: "Mozzarella Cucina ou Boule", brand: "Galbani", category: "Œufs & Produits laitiers", cal: 242, pro: 18.0, carb: 1.0, fat: 18.5, defaultPortion: 60, yukaScore: 68, nutriScore: 'C', additives: 0, bio: false },
+
+            // --- FRUITS & LÉGUMES ---
+            { id: 'brocoli', name: "Brocoli fleurettes vapeur Bio", brand: "Picard Bio", category: "Fruits & Légumes", cal: 35, pro: 2.8, carb: 4.2, fat: 0.4, defaultPortion: 180, yukaScore: 100, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'haricots_verts', name: "Haricots verts extra-fins", brand: "Bonduelle", category: "Fruits & Légumes", cal: 31, pro: 1.8, carb: 5.0, fat: 0.2, defaultPortion: 180, yukaScore: 95, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'courgette', name: "Courgettes fraîches ou poêlées", brand: "Maraîcher", category: "Fruits & Légumes", cal: 19, pro: 1.2, carb: 3.1, fat: 0.3, defaultPortion: 200, yukaScore: 98, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'epinards', name: "Épinards en branches vapeur Bio", brand: "Picard Bio", category: "Fruits & Légumes", cal: 25, pro: 3.0, carb: 1.8, fat: 0.5, defaultPortion: 180, yukaScore: 100, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'ratatouille_cassegrain', name: "Ratatouille cuisinée à la provençale", brand: "Cassegrain", category: "Fruits & Légumes", cal: 69, pro: 1.3, carb: 6.2, fat: 4.1, defaultPortion: 200, yukaScore: 86, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'tomates_cerises', name: "Tomates cerises grappe", brand: "Savéol", category: "Fruits & Légumes", cal: 21, pro: 0.9, carb: 3.9, fat: 0.2, defaultPortion: 150, yukaScore: 95, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'banane', name: "Banane Cavendish Bio (1 moyenne ≈ 120g)", brand: "Bio", category: "Fruits & Légumes", cal: 89, pro: 1.1, carb: 22.8, fat: 0.3, defaultPortion: 120, yukaScore: 100, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'pomme', name: "Pomme Pink Lady ou Gala (≈ 150g)", brand: "Verger FR", category: "Fruits & Légumes", cal: 52, pro: 0.3, carb: 13.8, fat: 0.2, defaultPortion: 150, yukaScore: 95, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'fruits_rouges', name: "Cocktail de Fruits Rouges surgelés Bio", brand: "Picard Bio", category: "Fruits & Légumes", cal: 45, pro: 1.1, carb: 8.5, fat: 0.3, defaultPortion: 100, yukaScore: 100, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'kiwi_vert', name: "Kiwi de l'Adour (2 kiwis ≈ 140g)", brand: "Oscar", category: "Fruits & Légumes", cal: 61, pro: 1.1, carb: 14.0, fat: 0.5, defaultPortion: 140, yukaScore: 96, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'compote_andros', name: "Compote Pomme Sans Sucres Ajoutés", brand: "Andros", category: "Fruits & Légumes", cal: 53, pro: 0.3, carb: 12.0, fat: 0.2, defaultPortion: 100, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+
+            // --- LIPIDES, OLÉAGINEUX & GRAINES ---
+            { id: 'amandes', name: "Amandes entières décortiquées Bio", brand: "Jean Hervé", category: "Lipides & Oléagineux", cal: 579, pro: 21.2, carb: 21.6, fat: 49.9, defaultPortion: 25, yukaScore: 95, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'noix_grenoble', name: "Cerneaux de Noix du Périgord", brand: "Daco Bello", category: "Lipides & Oléagineux", cal: 654, pro: 15.2, carb: 7.0, fat: 65.2, defaultPortion: 25, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'noix_cajou', name: "Noix de cajou nature non salées", brand: "Daco Bello", category: "Lipides & Oléagineux", cal: 553, pro: 18.2, carb: 30.2, fat: 43.8, defaultPortion: 25, yukaScore: 84, nutriScore: 'B', additives: 0, bio: false },
+            { id: 'beurre_cacahuete', name: "Purée de Cacahuète 100% Sans Huile de Palme Bio", brand: "Jean Hervé", category: "Lipides & Oléagineux", cal: 588, pro: 26.0, carb: 14.0, fat: 49.0, defaultPortion: 20, yukaScore: 96, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'graines_chia', name: "Graines de Chia Oméga-3 Bio", brand: "Markal", category: "Lipides & Oléagineux", cal: 486, pro: 16.5, carb: 42.1, fat: 30.7, defaultPortion: 15, yukaScore: 100, nutriScore: 'A', additives: 0, bio: true },
+            { id: 'avocat', name: "Avocat Hass (1/2 avocat ≈ 80g)", brand: "Marché", category: "Lipides & Oléagineux", cal: 160, pro: 2.0, carb: 8.5, fat: 14.7, defaultPortion: 80, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'huile_olive', name: "Huile d'olive Vierge Extra Bio (1 c.à.s ≈ 10g)", brand: "Puget Bio", category: "Lipides & Oléagineux", cal: 884, pro: 0.0, carb: 0.0, fat: 100.0, defaultPortion: 10, yukaScore: 82, nutriScore: 'C', additives: 0, bio: true },
+            { id: 'huile_colza', name: "Huile de Colza Riche en Oméga-3 Bio", brand: "Emile Noël", category: "Lipides & Oléagineux", cal: 884, pro: 0.0, carb: 0.0, fat: 100.0, defaultPortion: 10, yukaScore: 86, nutriScore: 'C', additives: 0, bio: true },
+
+            // --- SNACKS, SUPERMARCHÉ & COMPLÉMENTS ---
+            { id: 'chocolat_noir_85', name: "Chocolat Noir Excellence 85% Cacao", brand: "Lindt", category: "Snacks & Supermarché", cal: 584, pro: 12.5, carb: 19.0, fat: 46.0, defaultPortion: 20, yukaScore: 76, nutriScore: 'C', additives: 0, bio: false },
+            { id: 'houmous_atelier_blini', name: "Houmous Recette Traditionnelle Pois Chiches", brand: "L'Atelier Blini", category: "Snacks & Supermarché", cal: 285, pro: 6.8, carb: 12.0, fat: 22.0, defaultPortion: 50, yukaScore: 68, nutriScore: 'B', additives: 1, bio: false },
+            { id: 'barre_nakd', name: "Barre crue Dattes & Cajou (1 barre = 35g)", brand: "Nakd", category: "Snacks & Supermarché", cal: 392, pro: 8.9, carb: 49.0, fat: 16.5, defaultPortion: 35, yukaScore: 84, nutriScore: 'B', additives: 0, bio: false },
+            { id: 'miel_acacia', name: "Miel d'Acacia pur récolté en France", brand: "Famille Mary", category: "Snacks & Supermarché", cal: 304, pro: 0.3, carb: 82.0, fat: 0.0, defaultPortion: 15, yukaScore: 65, nutriScore: 'C', additives: 0, bio: false },
+            { id: 'pate_tartiner_nocciolata', name: "Nocciolata Sans Lait Cacao & Noisettes Bio", brand: "Rigoni di Asiago", category: "Snacks & Supermarché", cal: 540, pro: 6.2, carb: 54.0, fat: 32.0, defaultPortion: 20, yukaScore: 34, nutriScore: 'D', additives: 0, bio: true },
+            { id: 'whey_native_nutripure', name: "Whey Isolate Native Sans Additifs", brand: "Nutripure", category: "Compléments", cal: 372, pro: 84.0, carb: 3.5, fat: 2.2, defaultPortion: 30, yukaScore: 90, nutriScore: 'A', additives: 0, bio: false },
+            { id: 'proteine_vegetale_bio', name: "Protéine Végétale Pois & Riz Bio", brand: "Alter Nutrition", category: "Compléments", cal: 380, pro: 78.0, carb: 6.0, fat: 4.5, defaultPortion: 30, yukaScore: 96, nutriScore: 'A', additives: 0, bio: true }
+        ];
+
+        const MEAL_CONFIG = [
+            { key: 'breakfast', title: 'Petit-déjeuner', icon: 'fa-mug-hot', accent: 'amber', badgeBg: 'bg-amber-100 text-amber-700', targetPct: 0.25 },
+            { key: 'lunch', title: 'Déjeuner', icon: 'fa-utensils', accent: 'emerald', badgeBg: 'bg-emerald-100 text-emerald-700', targetPct: 0.35 },
+            { key: 'dinner', title: 'Dîner', icon: 'fa-moon', accent: 'indigo', badgeBg: 'bg-indigo-100 text-indigo-700', targetPct: 0.25 },
+            { key: 'snack', title: 'Collations / Post-Training', icon: 'fa-bolt', accent: 'rose', badgeBg: 'bg-rose-100 text-rose-700', targetPct: 0.15 }
+        ];
+
+        // ==========================================
+        // 2. UTILITAIRES DE SCORING YUKA & NUTRI-SCORE
+        // ==========================================
+        function getYukaMeta(score) {
+            const s = (typeof score === 'number' && !isNaN(score)) ? Math.round(score) : 75;
+            if (s >= 75) {
+                return {
+                    score: s,
+                    label: 'Excellent',
+                    dotColor: 'bg-green-700',
+                    textColor: 'text-green-800',
+                    badgeBg: 'bg-green-100 text-green-900 border-green-200',
+                    hex: '#15803d'
+                };
+            } else if (s >= 50) {
+                return {
+                    score: s,
+                    label: 'Bon',
+                    dotColor: 'bg-green-500',
+                    textColor: 'text-green-700',
+                    badgeBg: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+                    hex: '#22c55e'
+                };
+            } else if (s >= 25) {
+                return {
+                    score: s,
+                    label: 'Médiocre',
+                    dotColor: 'bg-orange-500',
+                    textColor: 'text-orange-700',
+                    badgeBg: 'bg-orange-50 text-orange-800 border-orange-200',
+                    hex: '#f97316'
+                };
+            } else {
+                return {
+                    score: s,
+                    label: 'Mauvais',
+                    dotColor: 'bg-red-500',
+                    textColor: 'text-red-700',
+                    badgeBg: 'bg-rose-50 text-rose-800 border-rose-200',
+                    hex: '#ef4444'
+                };
+            }
+        }
+
+        function getNutriScoreBadgeHTML(grade) {
+            const g = (grade || 'A').toUpperCase();
+            const colors = {
+                'A': 'bg-green-700 text-white',
+                'B': 'bg-lime-500 text-white',
+                'C': 'bg-amber-400 text-slate-900',
+                'D': 'bg-orange-500 text-white',
+                'E': 'bg-red-600 text-white'
+            };
+            const cls = colors[g] || colors['B'];
+            return `<span class="nutriscore-badge inline-flex items-center justify-center w-4 h-4 rounded text-[10px] ${cls}" title="Nutri-Score ${g}">${g}</span>`;
+        }
+
+        // Algorithme officiel Yuka simplifié pour les produits Open Food Facts :
+        // 60% Qualité nutritionnelle (Nutri-Score) + 30% Sans Additifs + 10% Bonus Bio
+        function computeYukaScoreFromOFF(product) {
+            // 1. Composante Nutri-Score (sur 60 points)
+            const grade = (product.nutriscore_grade || '').toLowerCase();
+            let nutriPts = 42; // Défaut si inconnu
+            if (grade === 'a') nutriPts = 56;
+            else if (grade === 'b') nutriPts = 46;
+            else if (grade === 'c') nutriPts = 32;
+            else if (grade === 'd') nutriPts = 18;
+            else if (grade === 'e') nutriPts = 6;
+
+            // 2. Composante Additifs (sur 30 points)
+            const additivesCount = typeof product.additives_n === 'number' ? product.additives_n : 0;
+            const nova = parseInt(product.nova_group) || 1;
+            let additivePts = 30;
+            if (additivesCount > 0) {
+                additivePts = Math.max(0, 30 - (additivesCount * 8));
+            }
+            if (nova === 4) {
+                additivePts = Math.max(0, additivePts - 8);
+            }
+
+            // 3. Composante Bio (sur 10 points)
+            const labels = (product.labels || '').toLowerCase();
+            const labelsTags = (product.labels_tags || []).join(' ').toLowerCase();
+            const isBio = labels.includes('bio') || labels.includes('organic') || labelsTags.includes('organic') || labelsTags.includes('ab-agriculture-biologique');
+            const bioPts = isBio ? 10 : 0;
+
+            const totalScore = Math.min(100, Math.max(5, Math.round(nutriPts + additivePts + bioPts)));
+            return {
+                yukaScore: totalScore,
+                nutriScore: ['a', 'b', 'c', 'd', 'e'].includes(grade) ? grade.toUpperCase() : 'B',
+                additives: additivesCount,
+                bio: isBio
+            };
+        }
+
+        // Base de secours pour les codes-barres célèbres si hors-ligne
+        const KNOWN_BARCODES_FALLBACK = {
+            '3033491485756': {
+                code: '3033491485756',
+                name: 'Skyr Nature 0% MG Riche en Protéines',
+                brand: 'Danone',
+                cal: 57, pro: 9.5, carb: 3.8, fat: 0.2,
+                sugars: 3.8, satFat: 0.1, fiber: 0.0, salt: 0.13,
+                yukaScore: 90, nutriScore: 'A', additives: 0, bio: false
+            },
+            '3229820129488': {
+                code: '3229820129488',
+                name: "Flocons d'Avoine Complète Bio",
+                brand: 'Bjorg',
+                cal: 372, pro: 13.5, carb: 58.7, fat: 7.0,
+                sugars: 1.2, satFat: 1.3, fiber: 10.0, salt: 0.02,
+                yukaScore: 100, nutriScore: 'A', additives: 0, bio: true
+            },
+            '3046920022651': {
+                code: '3046920022651',
+                name: 'Chocolat Noir Excellence 85% Cacao',
+                brand: 'Lindt',
+                cal: 584, pro: 12.5, carb: 19.0, fat: 46.0,
+                sugars: 14.0, satFat: 27.0, fiber: 15.0, salt: 0.03,
+                yukaScore: 76, nutriScore: 'C', additives: 0, bio: false
+            },
+            '8076809513753': {
+                code: '8076809513753',
+                name: 'Pâtes Penne Rigate Integrale Blé Complet',
+                brand: 'Barilla',
+                cal: 348, pro: 13.0, carb: 65.7, fat: 2.5,
+                sugars: 3.5, satFat: 0.5, fiber: 6.5, salt: 0.01,
+                yukaScore: 90, nutriScore: 'A', additives: 0, bio: false
+            }
+        };
+
+        // ==========================================
+        // 2B. SCANNER CAMÉRA EN DIRECT (HTML5-QRCODE + BARCODEDETECTOR + WEB AUDIO)
+        // ==========================================
+        let html5QrCodeInstance = null;
+        let isScannerRunning = false;
+        let currentCameraFacingMode = 'environment';
+        let currentScannedFoodObject = null;
+        let nativeBarcodeDetectorInterval = null;
+
+        // Bip sonore synthétique façon scanner Yuka / supermarché (Web Audio API)
+        function playScannerBeep() {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1350, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.18, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+            } catch (e) {
+                // Ignorer si l'audio est bloqué
+            }
+        }
+
+        async function openCameraScannerModal(targetMealKey = null) {
+            if (targetMealKey) {
+                document.getElementById('add-food-meal').value = targetMealKey;
+            }
+            const modal = document.getElementById('camera-scanner-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            // Réinitialiser l'affichage sur le flux caméra
+            document.getElementById('scanned-product-card').classList.add('hidden');
+            document.getElementById('scanner-viewport-wrapper').classList.remove('hidden');
+            document.getElementById('scanner-controls-bar').classList.remove('hidden');
+            document.getElementById('scanner-simulation-panel').classList.remove('hidden');
+            document.getElementById('manual-barcode-input').value = '';
+
+            // Vérifier si BarcodeDetector natif est supporté
+            const badgeEl = document.getElementById('scanner-engine-badge');
+            if ('BarcodeDetector' in window) {
+                badgeEl.textContent = 'BarcodeDetector Natif + HD';
+            } else {
+                badgeEl.textContent = 'Moteur HTML5-QRCode';
+            }
+
+            await populateCameraDevicesList();
+            await startLiveCameraScanner();
+        }
+
+        async function closeCameraScannerModal() {
+            await stopLiveCameraScanner();
+            const modal = document.getElementById('camera-scanner-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function populateCameraDevicesList() {
+            const selectEl = document.getElementById('camera-select');
+            if (typeof Html5Qrcode === 'undefined') return;
+            try {
+                const devices = await Html5Qrcode.getCameras();
+                if (devices && devices.length > 0) {
+                    selectEl.innerHTML = devices.map((d, idx) =>
+                        `<option value="${d.id}">${d.label || 'Caméra ' + (idx + 1)}</option>`
+                    ).join('');
+                }
+            } catch (err) {
+                selectEl.innerHTML = `
+                    <option value="environment">Caméra arrière (Environnement)</option>
+                    <option value="user">Caméra avant (Selfie / Webcam)</option>
+                `;
+            }
+        }
+
+        async function startLiveCameraScanner(specificDeviceId = null) {
+            await stopLiveCameraScanner();
+
+            const statusPill = document.getElementById('scanner-status-pill');
+            statusPill.innerHTML = `
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <span>Initialisation de la caméra...</span>
+            `;
+
+            if (typeof Html5Qrcode === 'undefined') {
+                statusPill.innerHTML = `<span class="text-amber-300">Bibliothèque caméra non chargée. Utilisez la simulation ci-dessous.</span>`;
+                return;
+            }
+
+            try {
+                html5QrCodeInstance = new Html5Qrcode("camera-reader");
+                const config = {
+                    fps: 12,
+                    qrbox: { width: 250, height: 140 },
+                    aspectRatio: 1.777778
+                };
+
+                const cameraConstraint = specificDeviceId
+                    ? { deviceId: { exact: specificDeviceId } }
+                    : { facingMode: currentCameraFacingMode };
+
+                await html5QrCodeInstance.start(
+                    cameraConstraint,
+                    config,
+                    (decodedText) => {
+                        onBarcodeDetectedSuccess(decodedText);
+                    },
+                    () => {
+                        // Frame sans code-barres
+                    }
+                );
+
+                isScannerRunning = true;
+                statusPill.innerHTML = `
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    <span>Caméra active • Visez un code-barres EAN-13</span>
+                `;
+
+                // Activer en parallèle BarcodeDetector natif sur l'élément <video> créé si disponible
+                attachNativeBarcodeDetectorBoost();
+            } catch (err) {
+                console.warn("Accès caméra refusé ou indisponible :", err);
+                statusPill.innerHTML = `
+                    <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+                    <span>Caméra inaccessible : importez une photo ou utilisez les boutons de simulation</span>
+                `;
+            }
+        }
+
+        function attachNativeBarcodeDetectorBoost() {
+            if (!('BarcodeDetector' in window)) return;
+            try {
+                const detector = new BarcodeDetector({
+                    formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128']
+                });
+                if (nativeBarcodeDetectorInterval) clearInterval(nativeBarcodeDetectorInterval);
+
+                nativeBarcodeDetectorInterval = setInterval(async () => {
+                    if (!isScannerRunning) return;
+                    const videoEl = document.querySelector('#camera-reader video');
+                    if (videoEl && videoEl.readyState >= 2) {
+                        try {
+                            const barcodes = await detector.detect(videoEl);
+                            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                                onBarcodeDetectedSuccess(barcodes[0].rawValue);
+                            }
+                        } catch (e) {}
+                    }
+                }, 250);
+            } catch (e) {}
+        }
+
+        async function stopLiveCameraScanner() {
+            if (nativeBarcodeDetectorInterval) {
+                clearInterval(nativeBarcodeDetectorInterval);
+                nativeBarcodeDetectorInterval = null;
+            }
+            if (html5QrCodeInstance && isScannerRunning) {
+                try {
+                    await html5QrCodeInstance.stop();
+                    await html5QrCodeInstance.clear();
+                } catch (e) {
+                    console.warn("Arrêt scanner:", e);
+                }
+            }
+            isScannerRunning = false;
+        }
+
+        async function switchCameraDevice(deviceId) {
+            if (!deviceId) return;
+            if (deviceId === 'environment' || deviceId === 'user') {
+                currentCameraFacingMode = deviceId;
+                await startLiveCameraScanner();
+            } else {
+                await startLiveCameraScanner(deviceId);
+            }
+        }
+
+        async function flipCameraFacingMode() {
+            currentCameraFacingMode = (currentCameraFacingMode === 'environment') ? 'user' : 'environment';
+            await startLiveCameraScanner();
+        }
+
+        // Import d'une image de code-barres depuis l'appareil
+        async function handleBarcodeImageUpload(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            await stopLiveCameraScanner();
+            const statusPill = document.getElementById('scanner-status-pill');
+            statusPill.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-emerald-400"></i> <span>Lecture du code-barres sur l'image...</span>`;
+
+            try {
+                // Essayer d'abord BarcodeDetector natif si présent
+                if ('BarcodeDetector' in window) {
+                    const bitmap = await createImageBitmap(file);
+                    const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'] });
+                    const codes = await detector.detect(bitmap);
+                    if (codes && codes.length > 0 && codes[0].rawValue) {
+                        onBarcodeDetectedSuccess(codes[0].rawValue);
+                        event.target.value = '';
+                        return;
+                    }
+                }
+
+                // Sinon utiliser html5-qrcode scanFile
+                const scanner = new Html5Qrcode("camera-reader");
+                const decodedText = await scanner.scanFile(file, true);
+                onBarcodeDetectedSuccess(decodedText);
+            } catch (err) {
+                showToast("Aucun code-barres lisible détecté sur cette image", "warning");
+                await startLiveCameraScanner();
+            } finally {
+                event.target.value = '';
+            }
+        }
+
+        function triggerManualBarcodeLookup() {
+            const code = document.getElementById('manual-barcode-input').value.trim();
+            if (!code) {
+                showToast("Veuillez saisir un numéro de code-barres", "warning");
+                return;
+            }
+            onBarcodeDetectedSuccess(code);
+        }
+
+        function simulateBarcodeScan(barcode) {
+            onBarcodeDetectedSuccess(barcode);
+        }
+
+        async function onBarcodeDetectedSuccess(rawCode) {
+            const cleanCode = String(rawCode).trim();
+            if (!cleanCode) return;
+
+            playScannerBeep();
+            await stopLiveCameraScanner();
+
+            // Masquer le flux vidéo et afficher la carte produit Yuka en chargement
+            document.getElementById('scanner-viewport-wrapper').classList.add('hidden');
+            document.getElementById('scanner-controls-bar').classList.add('hidden');
+            document.getElementById('scanner-simulation-panel').classList.add('hidden');
+
+            const cardEl = document.getElementById('scanned-product-card');
+            cardEl.classList.remove('hidden');
+            cardEl.innerHTML = `
+                <div class="p-8 bg-white rounded-2xl border border-slate-200 text-center space-y-3">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-xl">
+                        <i class="fa-solid fa-carrot fa-bounce"></i>
+                    </div>
+                    <div class="text-sm font-extrabold text-slate-800">Code-barres détecté : <span class="font-mono text-emerald-600">${cleanCode}</span></div>
+                    <p class="text-xs text-slate-500">Interrogation de la base Open Food Facts & calcul de la fiche Yuka...</p>
+                </div>
+            `;
+
+            await fetchAndDisplayScannedBarcode(cleanCode);
+        }
+
+        async function fetchAndDisplayScannedBarcode(barcode) {
+            const cardEl = document.getElementById('scanned-product-card');
+            let productData = null;
+
+            try {
+                const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=code,product_name,product_name_fr,brands,nutriments,nutriscore_grade,nova_group,additives_n,labels,labels_tags,image_front_small_url`);
+                const data = await res.json();
+
+                if (data && data.product) {
+                    const p = data.product;
+                    const nut = p.nutriments || {};
+                    const name = (p.product_name_fr || p.product_name || '').trim();
+                    if (name) {
+                        let cal = parseFloat(nut['energy-kcal_100g']);
+                        if (isNaN(cal) && nut['energy_100g']) {
+                            cal = Math.round(parseFloat(nut['energy_100g']) / 4.184);
+                        }
+                        const yukaInfo = computeYukaScoreFromOFF(p);
+                        productData = {
+                            id: 'scan_' + barcode,
+                            code: barcode,
+                            name: name,
+                            brand: (p.brands || '').split(',')[0].trim() || 'Supermarché',
+                            category: 'Snacks & Supermarché',
+                            cal: Math.round(cal || 0),
+                            pro: Math.round((parseFloat(nut['proteins_100g']) || 0) * 10) / 10,
+                            carb: Math.round((parseFloat(nut['carbohydrates_100g']) || 0) * 10) / 10,
+                            fat: Math.round((parseFloat(nut['fat_100g']) || 0) * 10) / 10,
+                            sugars: Math.round((parseFloat(nut['sugars_100g']) || 0) * 10) / 10,
+                            satFat: Math.round((parseFloat(nut['saturated-fat_100g']) || 0) * 10) / 10,
+                            fiber: Math.round((parseFloat(nut['fiber_100g']) || 0) * 10) / 10,
+                            salt: Math.round((parseFloat(nut['salt_100g']) || 0) * 100) / 100,
+                            defaultPortion: 100,
+                            yukaScore: yukaInfo.yukaScore,
+                            nutriScore: yukaInfo.nutriScore,
+                            additives: yukaInfo.additives,
+                            bio: yukaInfo.bio,
+                            image: p.image_front_small_url || null
+                        };
+                    }
+                }
+            } catch (err) {
+                console.warn("Utilisation du fallback local pour le code-barres :", barcode);
+            }
+
+            // Fallback si hors-ligne ou produit connu
+            if (!productData && KNOWN_BARCODES_FALLBACK[barcode]) {
+                const fb = KNOWN_BARCODES_FALLBACK[barcode];
+                productData = {
+                    ...fb,
+                    id: 'scan_' + barcode,
+                    category: 'Snacks & Supermarché',
+                    defaultPortion: 100
+                };
+            }
+
+            if (!productData) {
+                cardEl.innerHTML = `
+                    <div class="p-6 bg-white rounded-2xl border border-rose-200 text-center space-y-3">
+                        <div class="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-xl">
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                        </div>
+                        <h4 class="text-sm font-bold text-slate-800">Produit introuvable pour le code <span class="font-mono">${barcode}</span></h4>
+                        <p class="text-xs text-slate-500">Ce code-barres n'est pas encore référencé sur Open Food Facts ou la connexion a échoué.</p>
+                        <div class="flex justify-center gap-2 pt-2">
+                            <button type="button" onclick="resetScannerToCameraView()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition">
+                                <i class="fa-solid fa-camera mr-1"></i> Scanner un autre produit
+                            </button>
+                            <button type="button" onclick="closeCameraScannerModal(); toggleCustomFoodDrawer();" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">
+                                Créer manuellement
+                            </button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            currentScannedFoodObject = productData;
+            renderDetailedYukaScannedCard(productData);
+        }
+
+        function renderDetailedYukaScannedCard(food) {
+            const cardEl = document.getElementById('scanned-product-card');
+            const yMeta = getYukaMeta(food.yukaScore);
+            const currentMeal = document.getElementById('add-food-meal').value || 'lunch';
+
+            // Construction des critères Qualités / Défauts façon Yuka
+            const criteria = [
+                {
+                    label: 'Protéines',
+                    val: `${food.pro} g`,
+                    good: food.pro >= 8,
+                    icon: 'fa-dumbbell',
+                    desc: food.pro >= 12 ? 'Excellente source' : (food.pro >= 6 ? 'Apport correct' : 'Faible teneur')
+                },
+                {
+                    label: 'Sucres',
+                    val: `${food.sugars ?? 0} g`,
+                    good: (food.sugars ?? 0) <= 5,
+                    icon: 'fa-cube',
+                    desc: (food.sugars ?? 0) <= 5 ? 'Peu sucré' : ((food.sugars ?? 0) <= 15 ? 'Modéré' : 'Trop sucré')
+                },
+                {
+                    label: 'Graisses saturées',
+                    val: `${food.satFat ?? 0} g`,
+                    good: (food.satFat ?? 0) <= 2.5,
+                    icon: 'fa-droplet',
+                    desc: (food.satFat ?? 0) <= 2.5 ? 'Faible impact' : 'À limiter'
+                },
+                {
+                    label: 'Additifs',
+                    val: `${food.additives || 0}`,
+                    good: (food.additives || 0) === 0,
+                    icon: 'fa-flask',
+                    desc: (food.additives || 0) === 0 ? 'Aucun additif' : 'Additifs présents'
+                }
+            ];
+
+            const imgHTML = food.image ? `
+                <img src="${food.image}" alt="${food.name}" onerror="this.style.display='none'" class="w-20 h-20 rounded-2xl object-cover border border-slate-200 bg-white shadow-xs shrink-0">
+            ` : `
+                <div class="w-20 h-20 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 text-2xl shrink-0">
+                    <i class="fa-solid fa-carrot"></i>
+                </div>
+            `;
+
+            cardEl.innerHTML = `
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-4 sm:p-5">
+                    <!-- Top Product Header + Yuka Gauge -->
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                        <div class="flex items-center gap-3.5">
+                            ${imgHTML}
+                            <div>
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono text-[10px] font-bold">EAN: ${food.code}</span>
+                                    ${food.bio ? '<span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]"><i class="fa-solid fa-seedling mr-1"></i>BIO</span>' : ''}
+                                    ${getNutriScoreBadgeHTML(food.nutriScore)}
+                                </div>
+                                <h4 class="text-base font-extrabold text-slate-900 mt-1">${food.name}</h4>
+                                <p class="text-xs font-semibold text-slate-500">${food.brand || 'Supermarché'}</p>
+                            </div>
+                        </div>
+
+                        <!-- Circular Yuka Score Badge -->
+                        <div class="flex items-center gap-3 bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200/80 shrink-0 self-start sm:self-center">
+                            <div class="relative w-14 h-14 flex items-center justify-center">
+                                <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                    <circle cx="18" cy="18" r="15.5" fill="transparent" stroke="#e2e8f0" stroke-width="3.5"></circle>
+                                    <circle cx="18" cy="18" r="15.5" fill="transparent" stroke="${yMeta.hex}" stroke-width="3.5" stroke-dasharray="${food.yukaScore} 100" stroke-linecap="round"></circle>
+                                </svg>
+                                <span class="absolute text-xs font-extrabold text-slate-900">${food.yukaScore}<span class="text-[9px] text-slate-400">/100</span></span>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full ${yMeta.dotColor}"></span>
+                                    <span class="text-sm font-extrabold ${yMeta.textColor}">${yMeta.label}</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 block">Indice Qualité Yuka</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Macros for 100g -->
+                    <div class="grid grid-cols-4 gap-2 text-center">
+                        <div class="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-100">
+                            <span class="text-[10px] font-bold uppercase text-emerald-700 block">Énergie</span>
+                            <span class="text-sm font-extrabold text-emerald-600">${food.cal} kcal</span>
+                            <span class="text-[9px] text-slate-400 block">pour 100g</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-indigo-50/70 border border-indigo-100">
+                            <span class="text-[10px] font-bold uppercase text-indigo-700 block">Protéines</span>
+                            <span class="text-sm font-extrabold text-indigo-600">${food.pro} g</span>
+                            <span class="text-[9px] text-slate-400 block">pour 100g</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-amber-50/70 border border-amber-100">
+                            <span class="text-[10px] font-bold uppercase text-amber-700 block">Glucides</span>
+                            <span class="text-sm font-extrabold text-amber-600">${food.carb} g</span>
+                            <span class="text-[9px] text-slate-400 block">pour 100g</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-rose-50/70 border border-rose-100">
+                            <span class="text-[10px] font-bold uppercase text-rose-700 block">Lipides</span>
+                            <span class="text-sm font-extrabold text-rose-600">${food.fat} g</span>
+                            <span class="text-[9px] text-slate-400 block">pour 100g</span>
+                        </div>
+                    </div>
+
+                    <!-- Yuka Qualities & Defects Breakdown -->
+                    <div>
+                        <h5 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Analyse détaillée pour 100g (Critères Yuka)</h5>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            ${criteria.map(c => `
+                                <div class="p-2.5 rounded-xl border ${c.good ? 'bg-emerald-50/40 border-emerald-100' : 'bg-orange-50/40 border-orange-100'} flex flex-col justify-between">
+                                    <div class="flex items-center justify-between text-xs font-bold text-slate-700">
+                                        <span><i class="fa-solid ${c.icon} mr-1 text-slate-400"></i>${c.label}</span>
+                                        <span class="w-2 h-2 rounded-full ${c.good ? 'bg-green-500' : 'bg-orange-500'}"></span>
+                                    </div>
+                                    <div class="mt-1 flex items-baseline justify-between">
+                                        <span class="text-xs font-extrabold text-slate-900">${c.val}</span>
+                                        <span class="text-[10px] font-semibold ${c.good ? 'text-emerald-700' : 'text-orange-700'}">${c.desc}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Action Bar: Choose Grams & Target Meal -->
+                    <div class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <div>
+                                <label class="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Quantité (g)</label>
+                                <input type="number" id="scanned-food-grams" value="100" min="5" max="2000" step="5" class="w-20 px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-extrabold text-slate-800">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Repas cible</label>
+                                <select id="scanned-food-meal" class="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-800">
+                                    <option value="breakfast" ${currentMeal === 'breakfast' ? 'selected' : ''}>☀️ Petit-déjeuner</option>
+                                    <option value="lunch" ${currentMeal === 'lunch' ? 'selected' : ''}>🍽️ Déjeuner</option>
+                                    <option value="dinner" ${currentMeal === 'dinner' ? 'selected' : ''}>🌙 Dîner</option>
+                                    <option value="snack" ${currentMeal === 'snack' ? 'selected' : ''}>⚡ Collation</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="resetScannerToCameraView()" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-rotate-left"></i>
+                                <span>Scanner un autre</span>
+                            </button>
+                            <button type="button" onclick="saveScannedFoodToCatalogOnly()" class="px-3 py-2 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition">
+                                <i class="fa-solid fa-bookmark mr-1"></i> Catalogue
+                            </button>
+                            <button type="button" onclick="confirmAddScannedFoodToMeal()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-plus"></i>
+                                <span>Ajouter au repas</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function resetScannerToCameraView() {
+            document.getElementById('scanned-product-card').classList.add('hidden');
+            document.getElementById('scanner-viewport-wrapper').classList.remove('hidden');
+            document.getElementById('scanner-controls-bar').classList.remove('hidden');
+            document.getElementById('scanner-simulation-panel').classList.remove('hidden');
+            await startLiveCameraScanner();
+        }
+
+        function saveScannedFoodToCatalogOnly() {
+            if (!currentScannedFoodObject) return;
+            if (!getFoodById(currentScannedFoodObject.id)) {
+                state.customFoods.unshift({ ...currentScannedFoodObject, isCustom: true });
+                updateCatalogCountBadge();
+                saveStateToStorage();
+            }
+            selectFoodItem(currentScannedFoodObject.id);
+            showToast(`"${currentScannedFoodObject.name}" ajouté à votre catalogue Yuka !`, "success");
+        }
+
+        function confirmAddScannedFoodToMeal() {
+            if (!currentScannedFoodObject) return;
+            const grams = Math.max(5, parseInt(document.getElementById('scanned-food-grams').value) || 100);
+            const mealKey = document.getElementById('scanned-food-meal').value;
+
+            if (!getFoodById(currentScannedFoodObject.id)) {
+                state.customFoods.unshift({ ...currentScannedFoodObject, isCustom: true });
+                updateCatalogCountBadge();
+            }
+
+            addFoodObjectToMeal(currentScannedFoodObject, grams, mealKey);
+            selectFoodItem(currentScannedFoodObject.id);
+            closeCameraScannerModal();
+        }
+
+        // ==========================================
+        // 3. ÉTAT DE L'APPLICATION (STATE)
+        // ==========================================
+        const STORAGE_KEY = 'nutritrack_pro_yuka_state_v2';
+
+        let state = {
+            profile: {
+                gender: 'male',
+                age: 32,
+                weight: 76,
+                height: 178,
+                activity: 1.55, // Modérément actif (Cross-training / Course)
+                goal: 'maintain', // 'cut', 'maintain', 'bulk'
+                macroPreset: 'sport',
+                macrosPct: {
+                    pro: 30,
+                    carb: 45,
+                    fat: 25
+                }
+            },
+            customFoods: [],
+            meals: {
+                breakfast: [],
+                lunch: [],
+                dinner: [],
+                snack: []
+            }
+        };
+
+        let selectedFoodId = 'avoine_bjorg';
+        let filterBioOnly = false;
+        let lastOffResults = [];
+
+        // ==========================================
+        // 4. INITIALISATION & LOCALSTORAGE
+        // ==========================================
+        window.onload = function() {
+            loadStateFromStorage();
+            syncProfileUI();
+            updateCatalogCountBadge();
+            selectFoodItem(selectedFoodId);
+            renderAll();
+
+            // Fermer le dropdown d'aliments en cliquant à l'extérieur
+            document.addEventListener('click', function(e) {
+                const dropdown = document.getElementById('food-dropdown');
+                const searchInput = document.getElementById('food-search-input');
+                if (dropdown && searchInput && !dropdown.contains(e.target) && e.target !== searchInput) {
+                    dropdown.classList.add('hidden');
+                }
+            });
+        };
+
+        function saveStateToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            } catch (err) {
+                console.warn('Impossible de sauvegarder dans localStorage:', err);
+            }
+        }
+
+        function loadStateFromStorage() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    state = {
+                        ...state,
+                        ...parsed,
+                        profile: { ...state.profile, ...(parsed.profile || {}) },
+                        meals: { ...state.meals, ...(parsed.meals || {}) },
+                        customFoods: parsed.customFoods || []
+                    };
+                } else {
+                    populateDefaultStarterDay();
+                }
+            } catch (err) {
+                console.warn('Erreur lecture localStorage:', err);
+            }
+        }
+
+        function getAllFoods() {
+            return [...state.customFoods, ...DEFAULT_FOODS];
+        }
+
+        function getFoodById(id) {
+            return getAllFoods().find(f => f.id === id);
+        }
+
+        function updateCatalogCountBadge() {
+            const countEl = document.getElementById('catalog-count-badge');
+            if (countEl) {
+                countEl.textContent = `${getAllFoods().length} aliments Yuka`;
+            }
+        }
+
+        // ==========================================
+        // 5. CALCULS MÉTABOLIQUES & SCORE YUKA QUOTIDIEN
+        // ==========================================
+        function calculateTargets() {
+            const { gender, age, weight, height, activity, goal, macrosPct } = state.profile;
+            
+            // Formule de Mifflin-St Jeor
+            let bmr = (10 * weight) + (6.25 * height) - (5 * age);
+            bmr += (gender === 'male') ? 5 : -161;
+            bmr = Math.round(bmr);
+
+            const tdee = Math.round(bmr * activity);
+
+            let goalMultiplier = 1.0;
+            if (goal === 'cut') goalMultiplier = 0.80;      // -20% sèche / perte de poids
+            if (goal === 'bulk') goalMultiplier = 1.12;     // +12% prise de masse propre / performance
+
+            const targetCal = Math.round(tdee * goalMultiplier);
+
+            const targetPro = Math.round((targetCal * (macrosPct.pro / 100)) / 4);
+            const targetCarb = Math.round((targetCal * (macrosPct.carb / 100)) / 4);
+            const targetFat = Math.round((targetCal * (macrosPct.fat / 100)) / 9);
+
+            return { bmr, tdee, targetCal, targetPro, targetCarb, targetFat };
+        }
+
+        function calculateConsumedTotals() {
+            let totalCal = 0, totalPro = 0, totalCarb = 0, totalFat = 0;
+            let weightedYukaSum = 0;
+            let totalWeightForYuka = 0;
+            let goodOrExcellentCount = 0;
+            let totalItemsCount = 0;
+            let totalAdditivesCount = 0;
+            let bioItemsCount = 0;
+
+            const mealTotals = {};
+
+            MEAL_CONFIG.forEach(m => {
+                let mCal = 0, mPro = 0, mCarb = 0, mFat = 0;
+                let mYukaSum = 0, mWeight = 0;
+
+                const items = state.meals[m.key] || [];
+                items.forEach(item => {
+                    const ratio = item.grams / 100;
+                    const itemCal = item.cal * ratio;
+                    mCal += itemCal;
+                    mPro += item.pro * ratio;
+                    mCarb += item.carb * ratio;
+                    mFat += item.fat * ratio;
+
+                    // Récupérer ou déduire le score Yuka de l'aliment
+                    const refFood = getFoodById(item.foodId);
+                    const yScore = (typeof item.yukaScore === 'number') ? item.yukaScore : (refFood ? refFood.yukaScore : 80);
+                    const isBio = (typeof item.bio === 'boolean') ? item.bio : (refFood ? refFood.bio : false);
+                    const addCount = (typeof item.additives === 'number') ? item.additives : (refFood ? refFood.additives || 0 : 0);
+
+                    const weightFactor = Math.max(10, itemCal); // Pondération énergétique
+                    mYukaSum += yScore * weightFactor;
+                    mWeight += weightFactor;
+
+                    weightedYukaSum += yScore * weightFactor;
+                    totalWeightForYuka += weightFactor;
+
+                    totalItemsCount++;
+                    if (yScore >= 50) goodOrExcellentCount++;
+                    if (isBio) bioItemsCount++;
+                    totalAdditivesCount += addCount;
+                });
+
+                mealTotals[m.key] = {
+                    cal: Math.round(mCal),
+                    pro: Math.round(mPro * 10) / 10,
+                    carb: Math.round(mCarb * 10) / 10,
+                    fat: Math.round(mFat * 10) / 10,
+                    yukaAvg: mWeight > 0 ? Math.round(mYukaSum / mWeight) : null
+                };
+
+                totalCal += mCal;
+                totalPro += mPro;
+                totalCarb += mCarb;
+                totalFat += mFat;
+            });
+
+            const dailyYukaScore = totalWeightForYuka > 0 ? Math.round(weightedYukaSum / totalWeightForYuka) : null;
+            const healthyPct = totalItemsCount > 0 ? Math.round((goodOrExcellentCount / totalItemsCount) * 100) : 0;
+
+            return {
+                cal: Math.round(totalCal),
+                pro: Math.round(totalPro),
+                carb: Math.round(totalCarb),
+                fat: Math.round(totalFat),
+                dailyYukaScore,
+                healthyPct,
+                totalAdditivesCount,
+                bioItemsCount,
+                totalItemsCount,
+                mealTotals
+            };
+        }
+
+        // ==========================================
+        // 6. ACTIONS PROFIL & MACROS
+        // ==========================================
+        function syncProfileUI() {
+            const p = state.profile;
+            document.getElementById('input-age').value = p.age;
+            document.getElementById('input-weight').value = p.weight;
+            document.getElementById('input-height').value = p.height;
+            document.getElementById('select-activity').value = p.activity;
+
+            const btnMale = document.getElementById('btn-gender-male');
+            const btnFemale = document.getElementById('btn-gender-female');
+            if (p.gender === 'male') {
+                btnMale.className = "py-2.5 px-4 rounded-xl border-2 border-indigo-600 bg-indigo-50 text-indigo-700 text-sm font-bold flex items-center justify-center space-x-2 transition-all";
+                btnFemale.className = "py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-sm font-semibold flex items-center justify-center space-x-2 transition-all";
+            } else {
+                btnFemale.className = "py-2.5 px-4 rounded-xl border-2 border-indigo-600 bg-indigo-50 text-indigo-700 text-sm font-bold flex items-center justify-center space-x-2 transition-all";
+                btnMale.className = "py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-sm font-semibold flex items-center justify-center space-x-2 transition-all";
+            }
+
+            ['cut', 'maintain', 'bulk'].forEach(g => {
+                const btn = document.getElementById(`btn-goal-${g}`);
+                if (p.goal === g) {
+                    btn.className = "p-2.5 rounded-xl border-2 border-indigo-600 bg-indigo-50/70 text-indigo-950 text-center transition-all flex flex-col items-center shadow-xs";
+                } else {
+                    btn.className = "p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-center transition-all flex flex-col items-center";
+                }
+            });
+
+            ['balanced', 'sport', 'highpro', 'lowcarb'].forEach(preset => {
+                const btn = document.getElementById(`preset-${preset}`);
+                if (p.macroPreset === preset) {
+                    btn.className = "px-3 py-2 rounded-xl border-2 border-indigo-600 bg-indigo-50/60 text-left transition-all";
+                } else {
+                    btn.className = "px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-left transition-all";
+                }
+            });
+
+            document.getElementById('slider-pro').value = p.macrosPct.pro;
+            document.getElementById('slider-carb').value = p.macrosPct.carb;
+            document.getElementById('slider-fat').value = p.macrosPct.fat;
+        }
+
+        function setGender(gender) {
+            state.profile.gender = gender;
+            syncProfileUI();
+            renderAll();
+            saveStateToStorage();
+        }
+
+        function setGoal(goal) {
+            state.profile.goal = goal;
+            syncProfileUI();
+            renderAll();
+            saveStateToStorage();
+        }
+
+        function updateProfileFromInputs() {
+            const age = parseInt(document.getElementById('input-age').value) || 30;
+            const weight = parseFloat(document.getElementById('input-weight').value) || 70;
+            const height = parseInt(document.getElementById('input-height').value) || 175;
+            const activity = parseFloat(document.getElementById('select-activity').value) || 1.55;
+
+            state.profile.age = Math.min(100, Math.max(14, age));
+            state.profile.weight = Math.min(250, Math.max(35, weight));
+            state.profile.height = Math.min(230, Math.max(120, height));
+            state.profile.activity = activity;
+
+            renderAll();
+            saveStateToStorage();
+        }
+
+        function applyMacroPreset(presetKey) {
+            const presets = {
+                balanced: { pro: 25, carb: 45, fat: 30 },
+                sport:    { pro: 30, carb: 45, fat: 25 },
+                highpro:  { pro: 35, carb: 40, fat: 25 },
+                lowcarb:  { pro: 35, carb: 25, fat: 40 }
+            };
+            if (presets[presetKey]) {
+                state.profile.macroPreset = presetKey;
+                state.profile.macrosPct = { ...presets[presetKey] };
+                syncProfileUI();
+                renderAll();
+                saveStateToStorage();
+            }
+        }
+
+        function adjustMacroSliders(changedKey) {
+            let pro = parseInt(document.getElementById('slider-pro').value);
+            let carb = parseInt(document.getElementById('slider-carb').value);
+            let fat = parseInt(document.getElementById('slider-fat').value);
+
+            const total = pro + carb + fat;
+            const diff = 100 - total;
+
+            if (changedKey === 'pro') {
+                carb = Math.max(10, Math.min(70, carb + diff));
+                const rem = 100 - (pro + carb);
+                fat = Math.max(10, rem);
+            } else if (changedKey === 'carb') {
+                fat = Math.max(10, Math.min(60, fat + diff));
+                const rem = 100 - (carb + fat);
+                pro = Math.max(10, rem);
+            } else if (changedKey === 'fat') {
+                carb = Math.max(10, Math.min(70, carb + diff));
+                const rem = 100 - (fat + carb);
+                pro = Math.max(10, rem);
+            }
+
+            state.profile.macroPreset = 'custom';
+            state.profile.macrosPct = { pro, carb, fat };
+            syncProfileUI();
+            renderAll();
+            saveStateToStorage();
+        }
+
+        // ==========================================
+        // 7. CATALOGUE YUKA, FILTRES & AJOUT AUX REPAS
+        // ==========================================
+        function toggleBioFilter() {
+            filterBioOnly = !filterBioOnly;
+            const btn = document.getElementById('btn-filter-bio');
+            if (filterBioOnly) {
+                btn.className = "w-full py-1.5 px-3 rounded-lg border-2 border-emerald-600 bg-emerald-50 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 transition";
+            } else {
+                btn.className = "w-full py-1.5 px-3 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-50 transition";
+            }
+            onFilterChange();
+        }
+
+        function onFilterChange() {
+            showFoodDropdown();
+        }
+
+        function showFoodDropdown() {
+            filterFoodDropdown();
+            document.getElementById('food-dropdown').classList.remove('hidden');
+        }
+
+        function clearFoodSearch() {
+            const input = document.getElementById('food-search-input');
+            input.value = '';
+            document.getElementById('clear-search-btn').classList.add('hidden');
+            showFoodDropdown();
+            input.focus();
+        }
+
+        function filterFoodDropdown() {
+            const query = document.getElementById('food-search-input').value.trim().toLowerCase();
+            const clearBtn = document.getElementById('clear-search-btn');
+            if (query.length > 0) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
+
+            const catFilter = document.getElementById('filter-category').value;
+            const minYuka = parseInt(document.getElementById('filter-yuka').value) || 0;
+            const sortBy = document.getElementById('filter-sort').value;
+
+            let filtered = getAllFoods().filter(f => {
+                const matchText = !query || 
+                    f.name.toLowerCase().includes(query) || 
+                    (f.brand && f.brand.toLowerCase().includes(query)) ||
+                    (f.category && f.category.toLowerCase().includes(query));
+                const matchCat = (catFilter === 'all') || (f.category === catFilter);
+                const matchYuka = (f.yukaScore ?? 80) >= minYuka;
+                const matchBio = !filterBioOnly || f.bio === true;
+                return matchText && matchCat && matchYuka && matchBio;
+            });
+
+            // Tri
+            filtered.sort((a, b) => {
+                if (sortBy === 'yuka_desc') return (b.yukaScore ?? 80) - (a.yukaScore ?? 80);
+                if (sortBy === 'pro_desc') return b.pro - a.pro;
+                if (sortBy === 'cal_asc') return a.cal - b.cal;
+                return a.name.localeCompare(b.name);
+            });
+
+            const dropdown = document.getElementById('food-dropdown');
+            dropdown.classList.remove('hidden');
+
+            if (filtered.length === 0) {
+                dropdown.innerHTML = `
+                    <div class="p-4 text-center text-xs text-slate-500 space-y-2">
+                        <p>Aucun aliment local ne correspond à "${query}" avec ces filtres.</p>
+                        <div class="flex justify-center gap-2">
+                            <button type="button" onclick="openYukaSearchModal('${query.replace(/'/g, "\\'")}')" class="px-3 py-1.5 bg-orange-500 text-white rounded-lg font-bold hover:bg-orange-600 transition">
+                                <i class="fa-solid fa-magnifying-glass mr-1"></i> Chercher "${query}" sur Yuka / OpenFoodFacts
+                            </button>
+                            <button type="button" onclick="toggleCustomFoodDrawer()" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg font-bold hover:bg-indigo-100 transition">
+                                Créer manuellement
+                            </button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            dropdown.innerHTML = filtered.map(food => {
+                const yMeta = getYukaMeta(food.yukaScore ?? 85);
+                return `
+                    <button type="button" onclick="selectFoodItem('${food.id}')" class="w-full px-3.5 py-2.5 text-left hover:bg-indigo-50/70 flex items-center justify-between gap-2 transition">
+                        <div class="min-w-0 flex-1">
+                            <div class="text-xs font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                                <span class="truncate">${food.name}</span>
+                                ${food.brand ? `<span class="text-[10px] font-semibold text-slate-400">• ${food.brand}</span>` : ''}
+                                ${food.bio ? '<span class="px-1.5 py-0.2 text-[9px] bg-emerald-100 text-emerald-800 rounded font-bold">BIO</span>' : ''}
+                                ${food.isCustom ? '<span class="px-1.5 py-0.2 text-[9px] bg-indigo-100 text-indigo-700 rounded font-semibold">Perso</span>' : ''}
+                            </div>
+                            <div class="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
+                                <span class="inline-flex items-center gap-1 font-bold ${yMeta.textColor}">
+                                    <span class="w-2 h-2 rounded-full ${yMeta.dotColor}"></span>
+                                    Yuka ${yMeta.score}/100 (${yMeta.label})
+                                </span>
+                                <span>•</span>
+                                <span>${food.category || 'Aliment'}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            ${getNutriScoreBadgeHTML(food.nutriScore || 'A')}
+                            <div class="text-right text-[11px] font-semibold space-x-1">
+                                <span class="text-emerald-600 font-bold">${food.cal} kcal</span>
+                                <span class="text-indigo-600">P:${food.pro}</span>
+                                <span class="text-amber-600">G:${food.carb}</span>
+                                <span class="text-rose-600">L:${food.fat}</span>
+                            </div>
+                        </div>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function selectFoodItem(foodId) {
+            const food = getFoodById(foodId);
+            if (!food) return;
+
+            selectedFoodId = food.id;
+            const searchInput = document.getElementById('food-search-input');
+            searchInput.value = food.brand ? `${food.name} (${food.brand})` : food.name;
+            document.getElementById('clear-search-btn').classList.remove('hidden');
+            document.getElementById('food-dropdown').classList.add('hidden');
+            document.getElementById('add-food-qty').value = food.defaultPortion || 100;
+
+            updateSelectedFoodPreview();
+        }
+
+        function updateSelectedFoodPreview() {
+            const food = getFoodById(selectedFoodId);
+            const qty = parseFloat(document.getElementById('add-food-qty').value) || 0;
+            if (!food) return;
+
+            const ratio = qty / 100;
+            const cal = Math.round(food.cal * ratio);
+            const pro = (food.pro * ratio).toFixed(1);
+            const carb = (food.carb * ratio).toFixed(1);
+            const fat = (food.fat * ratio).toFixed(1);
+            const yMeta = getYukaMeta(food.yukaScore ?? 85);
+
+            document.getElementById('preview-food-name').innerHTML = `
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold ${yMeta.badgeBg}">
+                    <span class="w-2.5 h-2.5 rounded-full ${yMeta.dotColor}"></span>
+                    Yuka ${yMeta.score}/100 • ${yMeta.label}
+                </span>
+                ${getNutriScoreBadgeHTML(food.nutriScore || 'A')}
+                ${food.bio ? '<span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]"><i class="fa-solid fa-seedling mr-1"></i>BIO</span>' : ''}
+                <span class="text-slate-700 font-medium">Pour <strong>${qty}g</strong> de <strong>${food.name}</strong></span>
+            `;
+            document.getElementById('preview-food-macros').innerHTML = `
+                <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">${cal} kcal</span>
+                <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">P: ${pro}g</span>
+                <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800">G: ${carb}g</span>
+                <span class="px-2 py-0.5 rounded bg-rose-100 text-rose-800">L: ${fat}g</span>
+            `;
+        }
+
+        function addSelectedFoodToMeal() {
+            const food = getFoodById(selectedFoodId);
+            if (!food) {
+                showToast("Veuillez sélectionner un aliment dans la liste", "warning");
+                return;
+            }
+
+            const grams = Math.max(1, parseInt(document.getElementById('add-food-qty').value) || 100);
+            const mealKey = document.getElementById('add-food-meal').value;
+
+            addFoodObjectToMeal(food, grams, mealKey);
+        }
+
+        function addFoodObjectToMeal(food, grams, mealKey) {
+            const existingIndex = state.meals[mealKey].findIndex(item => item.foodId === food.id);
+            if (existingIndex > -1) {
+                state.meals[mealKey][existingIndex].grams += grams;
+            } else {
+                state.meals[mealKey].push({
+                    uid: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                    foodId: food.id,
+                    name: food.brand ? `${food.name} (${food.brand})` : food.name,
+                    cal: food.cal,
+                    pro: food.pro,
+                    carb: food.carb,
+                    fat: food.fat,
+                    yukaScore: food.yukaScore ?? 85,
+                    nutriScore: food.nutriScore || 'A',
+                    bio: food.bio || false,
+                    additives: food.additives || 0,
+                    grams: grams
+                });
+            }
+
+            renderAll();
+            saveStateToStorage();
+            showToast(`${grams}g de ${food.name} (Yuka ${food.yukaScore ?? 85}/100) ajouté !`, "success");
+        }
+
+        function updateMealItemGrams(mealKey, uid, newGrams) {
+            const val = parseInt(newGrams);
+            if (isNaN(val) || val <= 0) return;
+
+            const item = state.meals[mealKey].find(i => i.uid === uid);
+            if (item) {
+                item.grams = Math.min(2500, val);
+                renderDashboardAndSummary();
+                updateMealHeaderStats(mealKey);
+                updateSingleItemRowMacros(mealKey, uid);
+                saveStateToStorage();
+            }
+        }
+
+        function removeMealItem(mealKey, uid) {
+            state.meals[mealKey] = state.meals[mealKey].filter(i => i.uid !== uid);
+            renderAll();
+            saveStateToStorage();
+        }
+
+        function quickSelectMealForAdding(mealKey) {
+            document.getElementById('add-food-meal').value = mealKey;
+            const searchInput = document.getElementById('food-search-input');
+            searchInput.value = '';
+            searchInput.focus();
+            showFoodDropdown();
+        }
+
+        // ==========================================
+        // 8. RECHERCHE LIVE OPEN FOOD FACTS / YUKA
+        // ==========================================
+        function openYukaSearchModal(initialQuery = '') {
+            const modal = document.getElementById('yuka-search-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            // Synchroniser le repas cible avec celui sélectionné sur la page principale
+            document.getElementById('off-modal-meal').value = document.getElementById('add-food-meal').value;
+
+            const input = document.getElementById('off-live-query');
+            if (initialQuery) {
+                input.value = initialQuery;
+                searchOpenFoodFactsLive();
+            } else if (!input.value) {
+                renderOffInitialSuggestions();
+            }
+            setTimeout(() => input.focus(), 100);
+        }
+
+        function closeYukaSearchModal() {
+            const modal = document.getElementById('yuka-search-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function quickOffSearch(term) {
+            document.getElementById('off-live-query').value = term;
+            searchOpenFoodFactsLive();
+        }
+
+        function renderOffInitialSuggestions() {
+            const container = document.getElementById('off-results-container');
+            // Afficher d'emblée les meilleurs produits de supermarché de notre base locale en attendant une recherche
+            const featured = DEFAULT_FOODS.slice(0, 8);
+            lastOffResults = featured;
+            container.innerHTML = `
+                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">
+                    🌟 Sélection Top Score Yuka (Supermarchés France) — Tapez une recherche ci-dessus pour interroger Open Food Facts en direct
+                </div>
+                ${featured.map((f, idx) => renderOffProductCard(f, idx)).join('')}
+            `;
+        }
+
+        async function searchOpenFoodFactsLive() {
+            const query = document.getElementById('off-live-query').value.trim();
+            const container = document.getElementById('off-results-container');
+            const btn = document.getElementById('btn-off-search');
+
+            if (!query) {
+                renderOffInitialSuggestions();
+                return;
+            }
+
+            // 1. Chercher d'abord les correspondances instantanées dans notre base Yuka locale
+            const qLower = query.toLowerCase();
+            const localMatches = getAllFoods().filter(f =>
+                f.name.toLowerCase().includes(qLower) ||
+                (f.brand && f.brand.toLowerCase().includes(qLower))
+            );
+
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i><span>Scan Yuka...</span>`;
+
+            container.innerHTML = `
+                <div class="py-10 text-center space-y-2">
+                    <i class="fa-solid fa-carrot fa-bounce text-2xl text-orange-500"></i>
+                    <p class="text-xs font-bold text-slate-700">Interrogation de la base Open Food Facts France pour "${query}"...</p>
+                    <p class="text-[11px] text-slate-400">Calcul des scores Yuka (Nutri-Score 60%, Additifs 30%, Bio 10%)</p>
+                </div>
+            `;
+
+            try {
+                let apiProducts = [];
+                const isBarcode = /^[0-9]{8,14}$/.test(query);
+
+                if (isBarcode) {
+                    const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(query)}.json?fields=code,product_name,product_name_fr,brands,nutriments,nutriscore_grade,nova_group,additives_n,labels,labels_tags,image_front_small_url`);
+                    const data = await res.json();
+                    if (data && data.product) apiProducts = [data.product];
+                } else {
+                    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=14&cc=fr&lc=fr&fields=code,product_name,product_name_fr,brands,nutriments,nutriscore_grade,nova_group,additives_n,labels,labels_tags,image_front_small_url`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (data && Array.isArray(data.products)) {
+                        apiProducts = data.products;
+                    }
+                }
+
+                const parsedRemote = apiProducts
+                    .map(p => {
+                        const nut = p.nutriments || {};
+                        const name = (p.product_name_fr || p.product_name || '').trim();
+                        if (!name) return null;
+
+                        let cal = parseFloat(nut['energy-kcal_100g']);
+                        if (isNaN(cal) && nut['energy_100g']) {
+                            cal = Math.round(parseFloat(nut['energy_100g']) / 4.184);
+                        }
+                        const pro = parseFloat(nut['proteins_100g']) || 0;
+                        const carb = parseFloat(nut['carbohydrates_100g']) || 0;
+                        const fat = parseFloat(nut['fat_100g']) || 0;
+
+                        if (isNaN(cal)) return null;
+
+                        const yukaInfo = computeYukaScoreFromOFF(p);
+                        return {
+                            id: 'off_' + (p.code || Date.now() + Math.random().toString(36).substring(2, 6)),
+                            name: name,
+                            brand: (p.brands || '').split(',')[0].trim() || 'Supermarché',
+                            category: 'Snacks & Supermarché',
+                            cal: Math.round(cal),
+                            pro: Math.round(pro * 10) / 10,
+                            carb: Math.round(carb * 10) / 10,
+                            fat: Math.round(fat * 10) / 10,
+                            defaultPortion: 100,
+                            yukaScore: yukaInfo.yukaScore,
+                            nutriScore: yukaInfo.nutriScore,
+                            additives: yukaInfo.additives,
+                            bio: yukaInfo.bio,
+                            image: p.image_front_small_url || null,
+                            isRemote: true
+                        };
+                    })
+                    .filter(Boolean);
+
+                // Combiner résultats locaux vérifiés + résultats live OpenFoodFacts
+                const combined = [...localMatches, ...parsedRemote];
+                lastOffResults = combined;
+
+                if (combined.length === 0) {
+                    container.innerHTML = `
+                        <div class="p-8 text-center text-xs text-slate-500">
+                            Aucun produit trouvé pour "${query}". Essayez un terme plus générique (ex: "Skyr", "Muesli", "Poulet").
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = combined.map((item, idx) => renderOffProductCard(item, idx)).join('');
+                }
+            } catch (err) {
+                console.warn('Fallback sur la base Yuka locale:', err);
+                lastOffResults = localMatches.length > 0 ? localMatches : DEFAULT_FOODS.slice(0, 10);
+                container.innerHTML = `
+                    <div class="p-2.5 mb-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
+                        <i class="fa-solid fa-wifi"></i>
+                        <span>Mode hors-ligne ou serveur OpenFoodFacts occupé : affichage des produits certifiés de la base locale Yuka.</span>
+                    </div>
+                    ${lastOffResults.map((item, idx) => renderOffProductCard(item, idx)).join('')}
+                `;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i><span>Rechercher</span>`;
+            }
+        }
+
+        function renderOffProductCard(food, idx) {
+            const yMeta = getYukaMeta(food.yukaScore ?? 80);
+            const imgHTML = food.image ? `
+                <img src="${food.image}" alt="${food.name}" onerror="this.style.display='none'" class="w-12 h-12 rounded-xl object-cover border border-slate-200 bg-white shrink-0">
+            ` : `
+                <div class="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+                    <i class="fa-solid fa-basket-shopping"></i>
+                </div>
+            `;
+
+            return `
+                <div class="p-3 bg-white rounded-xl border border-slate-200/80 hover:border-orange-300 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+                    <div class="flex items-center gap-3 min-w-0">
+                        ${imgHTML}
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="text-xs font-extrabold text-slate-900 truncate">${food.name}</span>
+                                ${food.brand ? `<span class="text-[11px] font-semibold text-slate-500">• ${food.brand}</span>` : ''}
+                                ${food.bio ? '<span class="px-1.5 py-0.5 text-[9px] bg-emerald-100 text-emerald-800 rounded font-bold">BIO</span>' : ''}
+                            </div>
+                            <div class="flex items-center gap-2 mt-1 flex-wrap text-[11px]">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-bold ${yMeta.badgeBg}">
+                                    <span class="w-2 h-2 rounded-full ${yMeta.dotColor}"></span>
+                                    ${yMeta.score}/100 • ${yMeta.label}
+                                </span>
+                                ${getNutriScoreBadgeHTML(food.nutriScore || 'B')}
+                                <span class="text-slate-400 text-[10px]">
+                                    ${food.additives > 0 ? `<i class="fa-solid fa-flask text-orange-500 mr-0.5"></i>${food.additives} additif(s)` : '<i class="fa-solid fa-check text-emerald-600 mr-0.5"></i>Sans additif'}
+                                </span>
+                            </div>
+                            <div class="text-[11px] font-semibold space-x-2 mt-1">
+                                <span class="text-slate-500">Pour 100g :</span>
+                                <span class="text-emerald-600 font-bold">${food.cal} kcal</span>
+                                <span class="text-indigo-600">P: ${food.pro}g</span>
+                                <span class="text-amber-600">G: ${food.carb}g</span>
+                                <span class="text-rose-600">L: ${food.fat}g</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <button type="button" onclick="addOffResultToMeal(${idx})" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>Ajouter au repas</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function addOffResultToMeal(idx) {
+            const food = lastOffResults[idx];
+            if (!food) return;
+
+            // S'il vient d'Open Food Facts et n'est pas encore dans le catalogue local, l'enregistrer dans customFoods
+            if (!getFoodById(food.id)) {
+                state.customFoods.unshift({ ...food, isCustom: true });
+                updateCatalogCountBadge();
+            }
+
+            const grams = Math.max(5, parseInt(document.getElementById('off-modal-grams').value) || 100);
+            const mealKey = document.getElementById('off-modal-meal').value;
+
+            addFoodObjectToMeal(food, grams, mealKey);
+            selectFoodItem(food.id);
+            closeYukaSearchModal();
+        }
+
+        // ==========================================
+        // 9. CRÉATION D'ALIMENT PERSONNALISÉ AVEC SCORE YUKA
+        // ==========================================
+        function toggleCustomFoodDrawer() {
+            const drawer = document.getElementById('custom-food-drawer');
+            drawer.classList.toggle('hidden');
+            if (!drawer.classList.contains('hidden')) {
+                document.getElementById('custom-name').focus();
+            }
+        }
+
+        function saveCustomFood() {
+            const name = document.getElementById('custom-name').value.trim();
+            const cal = parseFloat(document.getElementById('custom-cal').value);
+            const pro = parseFloat(document.getElementById('custom-pro').value);
+            const carb = parseFloat(document.getElementById('custom-carb').value);
+            const fat = parseFloat(document.getElementById('custom-fat').value);
+            const yuka = parseInt(document.getElementById('custom-yuka').value);
+            const isBio = document.getElementById('custom-bio').checked;
+
+            if (!name || isNaN(cal) || isNaN(pro) || isNaN(carb) || isNaN(fat)) {
+                showToast("Veuillez remplir tous les champs nutritionnels", "warning");
+                return;
+            }
+
+            const yukaScore = isNaN(yuka) ? 80 : Math.min(100, Math.max(0, yuka));
+
+            const newFood = {
+                id: 'custom_' + Date.now(),
+                name: name,
+                brand: 'Perso',
+                category: 'Snacks & Supermarché',
+                cal: Math.max(0, Math.round(cal)),
+                pro: Math.max(0, Math.round(pro * 10) / 10),
+                carb: Math.max(0, Math.round(carb * 10) / 10),
+                fat: Math.max(0, Math.round(fat * 10) / 10),
+                yukaScore: yukaScore,
+                nutriScore: yukaScore >= 75 ? 'A' : (yukaScore >= 50 ? 'B' : 'C'),
+                additives: 0,
+                bio: isBio,
+                defaultPortion: 100,
+                isCustom: true
+            };
+
+            state.customFoods.unshift(newFood);
+            updateCatalogCountBadge();
+            saveStateToStorage();
+
+            document.getElementById('custom-name').value = '';
+            document.getElementById('custom-cal').value = '';
+            document.getElementById('custom-pro').value = '';
+            document.getElementById('custom-carb').value = '';
+            document.getElementById('custom-fat').value = '';
+            document.getElementById('custom-food-drawer').classList.add('hidden');
+
+            selectFoodItem(newFood.id);
+            showToast(`Aliment "${newFood.name}" (Yuka ${newFood.yukaScore}/100) enregistré !`, "success");
+        }
+
+        // ==========================================
+        // 10. GÉNÉRATEUR DE JOURNÉE TYPE HAUT SCORE YUKA
+        // ==========================================
+        function populateDefaultStarterDay() {
+            generateMealsForTarget(calculateTargets().targetCal, false);
+        }
+
+        function generateTypicalDay() {
+            const { targetCal } = calculateTargets();
+            generateMealsForTarget(targetCal, true);
+            renderAll();
+            saveStateToStorage();
+            showToast(`Journée type Yuka Excellent (~${targetCal} kcal) générée !`, "success");
+        }
+
+        function generateMealsForTarget(targetCal, randomize = true) {
+            const scale = targetCal / 2300;
+            const roundTo5 = (val) => Math.max(10, Math.round((val * scale) / 5) * 5);
+
+            const templates = [
+                {
+                    breakfast: [
+                        { id: 'avoine_bjorg', baseG: 75 },
+                        { id: 'oeufs', baseG: 120 },
+                        { id: 'banane', baseG: 110 },
+                        { id: 'amandes', baseG: 20 }
+                    ],
+                    lunch: [
+                        { id: 'poulet', baseG: 160 },
+                        { id: 'riz_complet_bio', baseG: 210 },
+                        { id: 'brocoli', baseG: 180 },
+                        { id: 'huile_olive', baseG: 10 }
+                    ],
+                    dinner: [
+                        { id: 'saumon', baseG: 140 },
+                        { id: 'patate_douce', baseG: 230 },
+                        { id: 'haricots_verts', baseG: 180 }
+                    ],
+                    snack: [
+                        { id: 'skyr_danone', baseG: 160 },
+                        { id: 'whey_native_nutripure', baseG: 30 },
+                        { id: 'fruits_rouges', baseG: 100 },
+                        { id: 'beurre_cacahuete', baseG: 15 }
+                    ]
+                },
+                {
+                    breakfast: [
+                        { id: 'pain_seigle_bio', baseG: 85 },
+                        { id: 'oeufs', baseG: 120 },
+                        { id: 'avocat', baseG: 75 },
+                        { id: 'skyr_danone', baseG: 150 }
+                    ],
+                    lunch: [
+                        { id: 'boeuf_5', baseG: 150 },
+                        { id: 'pates_cuites', baseG: 210 },
+                        { id: 'ratatouille_cassegrain', baseG: 190 },
+                        { id: 'huile_colza', baseG: 10 }
+                    ],
+                    dinner: [
+                        { id: 'tofu_ferme', baseG: 150 },
+                        { id: 'quinoa_cuit', baseG: 190 },
+                        { id: 'epinards', baseG: 170 },
+                        { id: 'chocolat_noir_85', baseG: 20 }
+                    ],
+                    snack: [
+                        { id: 'fromage_blanc_3', baseG: 150 },
+                        { id: 'compote_andros', baseG: 100 },
+                        { id: 'noix_grenoble', baseG: 25 }
+                    ]
+                }
+            ];
+
+            const chosen = randomize ? templates[Math.floor(Math.random() * templates.length)] : templates[0];
+
+            ['breakfast', 'lunch', 'dinner', 'snack'].forEach(mealKey => {
+                state.meals[mealKey] = chosen[mealKey].map(entry => {
+                    const food = getFoodById(entry.id) || DEFAULT_FOODS[0];
+                    return {
+                        uid: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+                        foodId: food.id,
+                        name: food.brand ? `${food.name} (${food.brand})` : food.name,
+                        cal: food.cal,
+                        pro: food.pro,
+                        carb: food.carb,
+                        fat: food.fat,
+                        yukaScore: food.yukaScore ?? 90,
+                        nutriScore: food.nutriScore || 'A',
+                        bio: food.bio || false,
+                        additives: food.additives || 0,
+                        grams: roundTo5(entry.baseG)
+                    };
+                });
+            });
+        }
+
+        function openResetModal() {
+            const modal = document.getElementById('reset-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeResetModal() {
+            const modal = document.getElementById('reset-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function confirmResetDay() {
+            state.meals = { breakfast: [], lunch: [], dinner: [], snack: [] };
+            closeResetModal();
+            renderAll();
+            saveStateToStorage();
+            showToast("Tous les repas de la journée ont été vidés", "info");
+        }
+
+        // ==========================================
+        // 11. RENDU GRAPHIQUE (TABLEAU DE BORD, SCORE YUKA & REPAS)
+        // ==========================================
+        function renderAll() {
+            renderDashboardAndSummary();
+            renderMealsGrid();
+        }
+
+        function renderDashboardAndSummary() {
+            const targets = calculateTargets();
+            const consumed = calculateConsumedTotals();
+
+            // 1. Badges BMR / TDEE / Cible
+            document.getElementById('bmr-badge').textContent = `BMR: ${targets.bmr} kcal`;
+            document.getElementById('tdee-display').textContent = `${targets.tdee} kcal`;
+            document.getElementById('target-cal-display').textContent = `${targets.targetCal} kcal`;
+
+            // 2. Labels des curseurs de macros
+            const { pro, carb, fat } = state.profile.macrosPct;
+            document.getElementById('label-pct-pro').textContent = pro;
+            document.getElementById('label-g-pro').textContent = targets.targetPro;
+            const gPerKg = (targets.targetPro / state.profile.weight).toFixed(1);
+            document.getElementById('label-gkg-pro').textContent = `${gPerKg}g/kg`;
+
+            document.getElementById('label-pct-carb').textContent = carb;
+            document.getElementById('label-g-carb').textContent = targets.targetCarb;
+
+            document.getElementById('label-pct-fat').textContent = fat;
+            document.getElementById('label-g-fat').textContent = targets.targetFat;
+
+            // 3. Score Yuka Quotidien
+            const yukaPill = document.getElementById('daily-yuka-pill');
+            const yukaDot = document.getElementById('daily-yuka-dot');
+            const yukaScoreEl = document.getElementById('daily-yuka-score');
+            const yukaLabelEl = document.getElementById('daily-yuka-label');
+            const yukaSummaryEl = document.getElementById('yuka-summary-details');
+            const bioCountEl = document.getElementById('bio-count-badge');
+
+            if (consumed.dailyYukaScore === null) {
+                yukaScoreEl.textContent = '--/100';
+                yukaLabelEl.textContent = 'Aucun aliment';
+                yukaDot.className = 'w-3 h-3 rounded-full bg-slate-400';
+                yukaPill.className = 'inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 border border-slate-200 text-slate-600';
+                yukaSummaryEl.textContent = "Ajoutez des aliments pour calculer l'indice Yuka de votre journée";
+                bioCountEl.textContent = "0 produit Bio";
+            } else {
+                const yMeta = getYukaMeta(consumed.dailyYukaScore);
+                yukaScoreEl.textContent = `${yMeta.score}/100`;
+                yukaLabelEl.textContent = yMeta.label;
+                yukaDot.className = `w-3 h-3 rounded-full ${yMeta.dotColor}`;
+                yukaPill.className = `inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border ${yMeta.badgeBg} shadow-2xs`;
+
+                const addTxt = consumed.totalAdditivesCount === 0
+                    ? '0 additif détecté'
+                    : `${consumed.totalAdditivesCount} additif(s) présent(s)`;
+                yukaSummaryEl.textContent = `${consumed.healthyPct}% d'aliments Bons ou Excellents • ${addTxt}`;
+                bioCountEl.textContent = `${consumed.bioItemsCount}/${consumed.totalItemsCount} Bio`;
+            }
+
+            // 4. Jauges du tableau de bord
+            document.getElementById('consumed-cal').textContent = consumed.cal;
+            document.getElementById('goal-cal').textContent = targets.targetCal;
+
+            const calDiff = targets.targetCal - consumed.cal;
+            const calRemEl = document.getElementById('cal-remaining-text');
+            if (calDiff > 0) {
+                calRemEl.textContent = `Reste ${calDiff} kcal à consommer`;
+                calRemEl.className = "text-xs text-slate-500 block";
+            } else if (calDiff === 0) {
+                calRemEl.textContent = `Objectif calorique atteint au kcal près !`;
+                calRemEl.className = "text-xs text-emerald-600 font-semibold block";
+            } else {
+                calRemEl.textContent = `Dépassement de ${Math.abs(calDiff)} kcal`;
+                calRemEl.className = "text-xs text-rose-600 font-semibold block";
+            }
+
+            const calPct = Math.min(100, Math.round((consumed.cal / targets.targetCal) * 100));
+            const barCal = document.getElementById('bar-cal');
+            barCal.style.width = `${calPct}%`;
+            if (consumed.cal > targets.targetCal * 1.08) {
+                barCal.className = "h-full bg-gradient-to-r from-rose-500 to-orange-500 rounded-full transition-all duration-500";
+            } else {
+                barCal.className = "h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500";
+            }
+
+            const statusPill = document.getElementById('status-pill');
+            if (consumed.cal === 0) {
+                statusPill.className = "inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600";
+                statusPill.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-400"></span><span>Journée vide</span>`;
+            } else if (consumed.cal >= targets.targetCal * 0.92 && consumed.cal <= targets.targetCal * 1.08) {
+                statusPill.className = "inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-100 text-emerald-800";
+                statusPill.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span>Cible atteinte (${calPct}%)</span>`;
+            } else if (consumed.cal < targets.targetCal * 0.92) {
+                statusPill.className = "inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-100 text-amber-800";
+                statusPill.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500"></span><span>${calPct}% de la cible</span>`;
+            } else {
+                statusPill.className = "inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-100 text-rose-800";
+                statusPill.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span><span>Surplus (+${Math.abs(calDiff)} kcal)</span>`;
+            }
+
+            updateMacroProgressBar('pro', consumed.pro, targets.targetPro);
+            updateMacroProgressBar('carb', consumed.carb, targets.targetCarb);
+            updateMacroProgressBar('fat', consumed.fat, targets.targetFat);
+
+            updateDonutChart(consumed);
+        }
+
+        function updateMacroProgressBar(key, consumedVal, goalVal) {
+            document.getElementById(`consumed-${key}`).textContent = consumedVal;
+            document.getElementById(`goal-${key}`).textContent = goalVal;
+            const rawPct = goalVal > 0 ? Math.round((consumedVal / goalVal) * 100) : 0;
+            document.getElementById(`pct-bar-${key}`).textContent = `${rawPct}%`;
+            document.getElementById(`bar-${key}`).style.width = `${Math.min(100, rawPct)}%`;
+        }
+
+        function updateDonutChart(consumed) {
+            const proCal = consumed.pro * 4;
+            const carbCal = consumed.carb * 4;
+            const fatCal = consumed.fat * 9;
+            const totalMacroCal = proCal + carbCal + fatCal;
+
+            document.getElementById('donut-center-cal').textContent = `${consumed.cal} kcal`;
+
+            if (totalMacroCal <= 0) {
+                document.getElementById('donut-pro').setAttribute('stroke-dasharray', '0 100');
+                document.getElementById('donut-carb').setAttribute('stroke-dasharray', '0 100');
+                document.getElementById('donut-fat').setAttribute('stroke-dasharray', '0 100');
+                document.getElementById('actual-pct-pro').textContent = '0%';
+                document.getElementById('actual-pct-carb').textContent = '0%';
+                document.getElementById('actual-pct-fat').textContent = '0%';
+                return;
+            }
+
+            const pPct = Math.round((proCal / totalMacroCal) * 100);
+            const cPct = Math.round((carbCal / totalMacroCal) * 100);
+            const fPct = Math.max(0, 100 - pPct - cPct);
+
+            const donutPro = document.getElementById('donut-pro');
+            const donutCarb = document.getElementById('donut-carb');
+            const donutFat = document.getElementById('donut-fat');
+
+            donutPro.setAttribute('stroke-dasharray', `${pPct} ${100 - pPct}`);
+            donutPro.setAttribute('stroke-dashoffset', '0');
+
+            donutCarb.setAttribute('stroke-dasharray', `${cPct} ${100 - cPct}`);
+            donutCarb.setAttribute('stroke-dashoffset', `-${pPct}`);
+
+            donutFat.setAttribute('stroke-dasharray', `${fPct} ${100 - fPct}`);
+            donutFat.setAttribute('stroke-dashoffset', `-${pPct + cPct}`);
+
+            document.getElementById('actual-pct-pro').textContent = `${pPct}% (${consumed.pro}g)`;
+            document.getElementById('actual-pct-carb').textContent = `${cPct}% (${consumed.carb}g)`;
+            document.getElementById('actual-pct-fat').textContent = `${fPct}% (${consumed.fat}g)`;
+        }
+
+        // ==========================================
+        // 12. RENDU DES 4 REPAS AVEC PASTILLES YUKA
+        // ==========================================
+        function renderMealsGrid() {
+            const container = document.getElementById('meals-container');
+            const { mealTotals } = calculateConsumedTotals();
+            const { targetCal } = calculateTargets();
+
+            container.innerHTML = MEAL_CONFIG.map(meal => {
+                const items = state.meals[meal.key] || [];
+                const mTot = mealTotals[meal.key];
+                const recommendedMealCal = Math.round(targetCal * meal.targetPct);
+                const mealYukaMeta = mTot.yukaAvg !== null ? getYukaMeta(mTot.yukaAvg) : null;
+
+                const itemsHTML = items.length === 0 ? `
+                    <div class="py-8 px-4 text-center">
+                        <div class="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2">
+                            <i class="fa-solid fa-plate-wheat"></i>
+                        </div>
+                        <p class="text-xs text-slate-400 font-medium">Aucun aliment planifié pour ce repas</p>
+                        <button type="button" onclick="quickSelectMealForAdding('${meal.key}')" class="mt-2 text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                            + Choisir un aliment Yuka
+                        </button>
+                    </div>
+                ` : items.map(item => {
+                    const ratio = item.grams / 100;
+                    const iCal = Math.round(item.cal * ratio);
+                    const iPro = (item.pro * ratio).toFixed(1);
+                    const iCarb = (item.carb * ratio).toFixed(1);
+                    const iFat = (item.fat * ratio).toFixed(1);
+
+                    const refFood = getFoodById(item.foodId);
+                    const yScore = (typeof item.yukaScore === 'number') ? item.yukaScore : (refFood ? refFood.yukaScore : 85);
+                    const isBio = (typeof item.bio === 'boolean') ? item.bio : (refFood ? refFood.bio : false);
+                    const yMeta = getYukaMeta(yScore);
+
+                    return `
+                        <div class="p-3 hover:bg-slate-50/80 transition flex items-center justify-between gap-2 group">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full ${yMeta.dotColor} shrink-0" title="Yuka ${yMeta.score}/100 (${yMeta.label})"></span>
+                                    <span class="text-xs font-bold text-slate-800 truncate">${item.name}</span>
+                                    ${isBio ? '<span class="px-1 py-0.2 text-[9px] bg-emerald-100 text-emerald-800 rounded font-bold shrink-0">BIO</span>' : ''}
+                                </div>
+                                <div class="text-[11px] font-medium space-x-2 mt-0.5 pl-4" id="macros-${item.uid}">
+                                    <span class="${yMeta.textColor} font-semibold text-[10px]">Yuka ${yMeta.score}/100</span>
+                                    <span>•</span>
+                                    <span class="text-emerald-600 font-bold">${iCal} kcal</span>
+                                    <span class="text-indigo-600">P: ${iPro}g</span>
+                                    <span class="text-amber-600">G: ${iCarb}g</span>
+                                    <span class="text-rose-600">L: ${iFat}g</span>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center space-x-1.5">
+                                <div class="relative flex items-center">
+                                    <input type="number" value="${item.grams}" min="1" max="2500" step="5"
+                                        oninput="updateMealItemGrams('${meal.key}', '${item.uid}', this.value)"
+                                        class="w-16 pr-5 pl-2 py-1 text-right bg-slate-100 hover:bg-white focus:bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <span class="absolute right-1.5 text-[10px] font-semibold text-slate-400 pointer-events-none">g</span>
+                                </div>
+                                <button type="button" onclick="removeMealItem('${meal.key}', '${item.uid}')" class="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition" title="Retirer">
+                                    <i class="fa-solid fa-xmark text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                return `
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 flex flex-col overflow-hidden">
+                        <!-- Meal Header -->
+                        <div class="p-4 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
+                            <div class="flex items-center space-x-2.5">
+                                <div class="w-8 h-8 rounded-xl ${meal.badgeBg} flex items-center justify-center shadow-2xs">
+                                    <i class="fa-solid ${meal.icon} text-sm"></i>
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-1.5">
+                                        <h3 class="font-bold text-slate-800 text-sm">${meal.title}</h3>
+                                        ${mealYukaMeta ? `
+                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${mealYukaMeta.badgeBg}">
+                                                <span class="w-1.5 h-1.5 rounded-full ${mealYukaMeta.dotColor}"></span>
+                                                ${mealYukaMeta.score}/100
+                                            </span>
+                                        ` : ''}
+                                    </div>
+                                    <span class="text-[10px] text-slate-400 block">Cible idéale : ~${recommendedMealCal} kcal</span>
+                                </div>
+                            </div>
+                            <div class="text-right" id="meal-header-stats-${meal.key}">
+                                <span class="text-sm font-extrabold text-slate-900 block">${mTot.cal} kcal</span>
+                                <div class="text-[10px] font-semibold space-x-1.5">
+                                    <span class="text-indigo-600">P:${mTot.pro}g</span>
+                                    <span class="text-amber-600">G:${mTot.carb}g</span>
+                                    <span class="text-rose-600">L:${mTot.fat}g</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Meal Items List -->
+                        <div class="divide-y divide-slate-100 flex-grow">
+                            ${itemsHTML}
+                        </div>
+
+                        <!-- Meal Footer Quick Add -->
+                        <div class="px-4 py-2.5 bg-slate-50/40 border-t border-slate-100 flex justify-between items-center">
+                            <span class="text-[11px] text-slate-400">${items.length} aliment(s)</span>
+                            <div class="flex items-center gap-3">
+                                <button type="button" onclick="openCameraScannerModal('${meal.key}')" class="text-xs font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-1">
+                                    <i class="fa-solid fa-camera text-[10px]"></i> Scan Caméra
+                                </button>
+                                <button type="button" onclick="document.getElementById('add-food-meal').value='${meal.key}'; openYukaSearchModal()" class="text-xs font-semibold text-orange-600 hover:text-orange-800 flex items-center gap-1">
+                                    <i class="fa-solid fa-magnifying-glass text-[10px]"></i> Base Yuka
+                                </button>
+                                <button type="button" onclick="quickSelectMealForAdding('${meal.key}')" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                                    <i class="fa-solid fa-plus text-[10px]"></i> Catalogue
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateMealHeaderStats(mealKey) {
+            const { mealTotals } = calculateConsumedTotals();
+            const mTot = mealTotals[mealKey];
+            const headerEl = document.getElementById(`meal-header-stats-${mealKey}`);
+            if (headerEl) {
+                headerEl.innerHTML = `
+                    <span class="text-sm font-extrabold text-slate-900 block">${mTot.cal} kcal</span>
+                    <div class="text-[10px] font-semibold space-x-1.5">
+                        <span class="text-indigo-600">P:${mTot.pro}g</span>
+                        <span class="text-amber-600">G:${mTot.carb}g</span>
+                        <span class="text-rose-600">L:${mTot.fat}g</span>
+                    </div>
+                `;
+            }
+        }
+
+        function updateSingleItemRowMacros(mealKey, uid) {
+            const item = state.meals[mealKey].find(i => i.uid === uid);
+            const rowEl = document.getElementById(`macros-${uid}`);
+            if (item && rowEl) {
+                const ratio = item.grams / 100;
+                const iCal = Math.round(item.cal * ratio);
+                const iPro = (item.pro * ratio).toFixed(1);
+                const iCarb = (item.carb * ratio).toFixed(1);
+                const iFat = (item.fat * ratio).toFixed(1);
+                const refFood = getFoodById(item.foodId);
+                const yScore = (typeof item.yukaScore === 'number') ? item.yukaScore : (refFood ? refFood.yukaScore : 85);
+                const yMeta = getYukaMeta(yScore);
+
+                rowEl.innerHTML = `
+                    <span class="${yMeta.textColor} font-semibold text-[10px]">Yuka ${yMeta.score}/100</span>
+                    <span>•</span>
+                    <span class="text-emerald-600 font-bold">${iCal} kcal</span>
+                    <span class="text-indigo-600">P: ${iPro}g</span>
+                    <span class="text-amber-600">G: ${iCarb}g</span>
+                    <span class="text-rose-600">L: ${iFat}g</span>
+                `;
+            }
+        }
+
+        // ==========================================
+        // 13. NOTIFICATIONS TOAST
+        // ==========================================
+        let toastTimeout = null;
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            const msg = document.getElementById('toast-message');
+
+            msg.textContent = message;
+            if (type === 'success') {
+                icon.className = "fa-solid fa-circle-check text-emerald-400";
+            } else if (type === 'warning') {
+                icon.className = "fa-solid fa-triangle-exclamation text-amber-400";
+            } else {
+                icon.className = "fa-solid fa-circle-info text-indigo-400";
+            }
+
+            toast.classList.remove('hidden');
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 2800);
+        }
+    </script>
+</body>
+</html>
